@@ -21,6 +21,7 @@ import { toast } from "sonner";
 type SidebarProps = {
   userName?: string | null;
   userEmail?: string | null;
+  unreadCount?: number;
 };
 
 const navItems = [
@@ -28,10 +29,10 @@ const navItems = [
   { href: "/dashboard/add-medicine", label: "İlaç Ekle", icon: PlusCircle },
   { href: "/dashboard/inventory", label: "Envanter", icon: List },
   { href: "/dashboard/schedule", label: "Takvim", icon: CalendarDays },
-  { href: "/dashboard/notifications", label: "Bildirimler", icon: Bell, badge: 3 },
+  { href: "/dashboard/notifications", label: "Bildirimler", icon: Bell },
 ];
 
-export function Sidebar({ userName, userEmail }: SidebarProps) {
+export function Sidebar({ userName, userEmail, unreadCount = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -124,9 +125,9 @@ export function Sidebar({ userName, userEmail }: SidebarProps) {
                 )}
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
-                {item.badge ? (
+                {item.href === "/dashboard/notifications" && unreadCount > 0 ? (
                   <span className="ml-auto bg-rose text-white text-[11px] font-bold px-[7px] py-[2px] rounded-full min-w-[20px] text-center">
-                    {item.badge}
+                    {unreadCount}
                   </span>
                 ) : null}
               </Link>

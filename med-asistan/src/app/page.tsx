@@ -112,6 +112,7 @@ export default function LandingPage() {
       const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         full_name: regName.trim(),
+        email: regEmail.trim().toLowerCase(),
       });
       if (profileError) {
         toast.error("Profil kaydedilemedi: " + profileError.message);

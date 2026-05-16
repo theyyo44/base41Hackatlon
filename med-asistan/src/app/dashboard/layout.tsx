@@ -19,10 +19,17 @@ export default async function DashboardLayout({
     userEmail = user.email ?? null;
     const { data: profile } = await supabase
       .from("profiles")
-      .select("full_name")
+      .select("full_name, email")
       .eq("id", user.id)
       .single();
     userName = profile?.full_name ?? user.user_metadata?.full_name ?? null;
+
+    if (profile && !profile.email && user.email) {
+      await supabase
+        .from("profiles")
+        .update({ email: user.email })
+        .eq("id", user.id);
+    }
 
     const { count } = await supabase
       .from("notifications")

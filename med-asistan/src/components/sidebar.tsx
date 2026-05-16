@@ -48,7 +48,7 @@ export function Sidebar({ userName, userEmail }: SidebarProps) {
     const supabase = createClient();
     await supabase.auth.signOut();
     toast.success("Çıkış yapıldı");
-    router.push("/login");
+    router.push("/");
   }
 
   return (

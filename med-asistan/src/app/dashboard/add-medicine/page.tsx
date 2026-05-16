@@ -2,12 +2,16 @@
 
 import { useState } from "react";
 import { Camera, Pencil, Sparkles, Clock, X, Check, Bell } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
-import { trDate } from "@/lib/mock-data";
+import { trDate } from "@/lib/helpers";
 
 export default function AddMedicinePage() {
+  const router = useRouter();
   const [step, setStep] = useState<"choose" | "photo" | "form">("choose");
   const [photoBusy, setPhotoBusy] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -52,29 +56,66 @@ export default function AddMedicinePage() {
     }, 1600);
   }
 
-  function submit() {
+  async function submit() {
     if (!form.name.trim()) {
       toast.error("İlaç adı gerekli");
       return;
     }
+    setSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Oturum bulunamadı");
+      setSaving(false);
+      return;
+    }
+
+    const { data: med, error: medError } = await supabase
+      .from("medicines")
+      .insert({
+        user_id: user.id,
+        name: form.name.trim(),
+        active_ingredient: form.activeIngredient.trim() || null,
+        dosage: form.dosage.trim() || null,
+        expiry_date: form.expiryDate || null,
+        quantity: form.quantity,
+        is_active: form.isActive,
+      })
+      .select("id")
+      .single();
+
+    if (medError || !med) {
+      toast.error("İlaç kaydedilemedi: " + (medError?.message || "Bilinmeyen hata"));
+      setSaving(false);
+      return;
+    }
+
+    if (form.times.length > 0) {
+      const { error: schedError } = await supabase.from("schedules").insert({
+        medicine_id: med.id,
+        user_id: user.id,
+        times: form.times,
+        start_date: form.startDate,
+        end_date: form.endDate || null,
+        notes: form.notes.trim() || null,
+      });
+      if (schedError) {
+        toast.error("Kullanım planı kaydedilemedi: " + schedError.message);
+      }
+    }
+
     toast.success(`${form.name} envantere eklendi`);
-    setForm({
-      name: "", activeIngredient: "", dosage: "1 tablet", expiryDate: "",
-      quantity: 1, isActive: true, notes: "", times: ["08:00"],
-      startDate: new Date().toISOString().slice(0, 10), endDate: "",
-    });
-    setStep("choose");
+    setSaving(false);
+    router.push("/dashboard/inventory");
   }
 
   return (
     <div>
-      {/* Topbar */}
       <div className="mb-7">
         <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">Yeni İlaç Ekle</h1>
         <p className="text-muted-foreground text-base m-0">Kutunun fotoğrafını çekin veya bilgileri elle girin</p>
       </div>
 
-      {/* Step: Choose */}
       {step === "choose" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] max-w-[880px]">
           <button
@@ -92,7 +133,6 @@ export default function AddMedicinePage() {
               <Sparkles className="w-3.5 h-3.5" /> Önerilen
             </div>
           </button>
-
           <button
             onClick={() => setStep("form")}
             className="text-left bg-card border border-border rounded-2xl p-8 hover:border-brand transition-colors"
@@ -108,7 +148,6 @@ export default function AddMedicinePage() {
         </div>
       )}
 
-      {/* Step: Photo */}
       {step === "photo" && (
         <div className="max-w-[720px]">
           <div
@@ -140,7 +179,6 @@ export default function AddMedicinePage() {
               </>
             )}
           </div>
-
           <div className="flex gap-3 mt-5 flex-wrap">
             <button onClick={fakeOCR} disabled={photoBusy} className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors disabled:opacity-50">
               <Camera className="w-[18px] h-[18px]" /> Kameradan Çek
@@ -152,72 +190,52 @@ export default function AddMedicinePage() {
               Geri
             </button>
           </div>
-
           <div className="bg-brand-soft border border-[oklch(0.9_0.04_220)] rounded-2xl p-5 mt-6">
             <div className="flex gap-3 items-start">
               <Sparkles className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
               <div className="text-sm text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">İpucu:</strong> Kutuyu iyi aydınlatılmış bir alana koyun ve yazıların net görünmesine dikkat edin. Sistem ilaç adı, etken madde, dozaj ve SKT bilgilerini otomatik tanır.
+                <strong className="text-foreground">İpucu:</strong> Kutuyu iyi aydınlatılmış bir alana koyun ve yazıların net görünmesine dikkat edin.
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Step: Form */}
       {step === "form" && (
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start max-w-[1100px]">
           <div className="bg-card border border-border rounded-2xl p-6">
             <h3 className="font-bold text-lg m-0 mb-[18px]">İlaç Bilgileri</h3>
-
             <div className="flex flex-col gap-2 mb-[18px]">
               <label className="text-sm font-bold text-muted-foreground">İlaç Adı *</label>
-              <input
-                type="text" value={form.name} onChange={(e) => set("name", e.target.value)}
-                placeholder="Örn. Parol 500mg"
-                className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
-              />
+              <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Örn. Parol 500mg"
+                className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
             </div>
-
             <div className="grid grid-cols-2 gap-3.5 mb-[18px]">
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Etken Madde</label>
-                <input
-                  type="text" value={form.activeIngredient} onChange={(e) => set("activeIngredient", e.target.value)}
-                  placeholder="Parasetamol 500mg"
-                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
-                />
+                <input type="text" value={form.activeIngredient} onChange={(e) => set("activeIngredient", e.target.value)} placeholder="Parasetamol 500mg"
+                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Doz</label>
-                <input
-                  type="text" value={form.dosage} onChange={(e) => set("dosage", e.target.value)}
-                  placeholder="1 tablet"
-                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
-                />
+                <input type="text" value={form.dosage} onChange={(e) => set("dosage", e.target.value)} placeholder="1 tablet"
+                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3.5 mb-[18px]">
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Son Kullanım Tarihi</label>
-                <input
-                  type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)}
-                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
-                />
+                <input type="date" value={form.expiryDate} onChange={(e) => set("expiryDate", e.target.value)}
+                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Adet (kalan)</label>
-                <input
-                  type="number" value={form.quantity} onChange={(e) => set("quantity", parseInt(e.target.value || "0", 10))}
-                  min={0}
-                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
-                />
+                <input type="number" value={form.quantity} onChange={(e) => set("quantity", parseInt(e.target.value || "0", 10))} min={0}
+                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
               </div>
             </div>
 
             <h3 className="font-bold text-lg m-0 mb-[18px] mt-6 pt-6 border-t border-border">Kullanım Planı</h3>
-
             <div className="flex flex-col gap-2 mb-[18px]">
               <label className="text-sm font-bold text-muted-foreground">Günde alınacak saatler</label>
               <div className="flex flex-wrap gap-2.5 items-center">
@@ -232,7 +250,6 @@ export default function AddMedicinePage() {
                 </button>
               </div>
             </div>
-
             <div className="grid grid-cols-2 gap-3.5 mb-[18px]">
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Başlangıç</label>
@@ -245,36 +262,34 @@ export default function AddMedicinePage() {
                   className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
               </div>
             </div>
-
             <div className="flex flex-col gap-2 mb-[18px]">
               <label className="text-sm font-bold text-muted-foreground">Notlar</label>
-              <textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)}
-                placeholder="Örn. Yemeklerden 30 dakika önce alın"
+              <textarea rows={3} value={form.notes} onChange={(e) => set("notes", e.target.value)} placeholder="Örn. Yemeklerden 30 dakika önce alın"
                 className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all resize-none" />
             </div>
-
             <div className="flex items-center gap-3 py-3.5 border-t border-border">
               <span className="font-semibold">Aktif kullanım</span>
-              <button
-                onClick={() => set("isActive", !form.isActive)}
-                className={`relative w-[46px] h-[26px] rounded-full transition-colors ${form.isActive ? "bg-brand" : "bg-muted-foreground/30"}`}
-              >
+              <button onClick={() => set("isActive", !form.isActive)}
+                className={`relative w-[46px] h-[26px] rounded-full transition-colors ${form.isActive ? "bg-brand" : "bg-muted-foreground/30"}`}>
                 <span className={`absolute top-[3px] w-5 h-5 rounded-full bg-white shadow transition-[left] ${form.isActive ? "left-[23px]" : "left-[3px]"}`} />
               </button>
               <span className="text-sm text-muted-foreground ml-auto">
                 {form.isActive ? "Bu ilaç şu anda kullanılıyor" : "Sadece envantere ekle"}
               </span>
             </div>
-
             <div className="flex gap-2.5 mt-[18px] justify-end">
               <button onClick={() => setStep("choose")} className="px-5 py-3 rounded-xl bg-card border border-border font-bold hover:bg-secondary transition-colors">İptal</button>
-              <button onClick={submit} className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors">
-                <Check className="w-[18px] h-[18px]" /> Kaydet
+              <button onClick={submit} disabled={saving}
+                className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors disabled:opacity-60">
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                ) : (
+                  <><Check className="w-[18px] h-[18px]" /> Kaydet</>
+                )}
               </button>
             </div>
           </div>
 
-          {/* Preview sidebar */}
           <div className="flex flex-col gap-[18px]">
             <div className="bg-card border border-border rounded-2xl p-6">
               <div className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase mb-3.5">Önizleme</div>

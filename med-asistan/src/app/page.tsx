@@ -94,17 +94,28 @@ export default function LandingPage() {
     const { data, error } = await supabase.auth.signUp({
       email: regEmail.trim().toLowerCase(),
       password: regPassword,
+      options: {
+        data: { full_name: regName.trim() },
+      },
     });
     if (error) {
       toast.error(translateError(error.message));
       setLoading(false);
       return;
     }
+    if (!data.session) {
+      toast.error("Email onayı gerekiyor. Supabase Dashboard'dan 'Confirm email' seçeneğini kapatın.");
+      setLoading(false);
+      return;
+    }
     if (data.user) {
-      await supabase.from("profiles").insert({
+      const { error: profileError } = await supabase.from("profiles").insert({
         id: data.user.id,
         full_name: regName.trim(),
       });
+      if (profileError) {
+        toast.error("Profil kaydedilemedi: " + profileError.message);
+      }
     }
     toast.success("Hesap oluşturuldu!");
     router.push("/dashboard");

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   Pill,
   Clock,
@@ -9,28 +9,98 @@ import {
   Check,
   Plus,
   Sparkles,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
-import {
-  mockMedicines,
-  getTodayDoses,
-  daysUntil,
-  expiryStatus,
-  trDate,
-  trWeekday,
-} from "@/lib/mock-data";
+import { createClient } from "@/lib/supabase/client";
+import { trDate, trWeekday, daysUntil, expiryStatus } from "@/lib/helpers";
 import { toast } from "sonner";
 
+type MedicineWithSchedule = {
+  id: string;
+  name: string;
+  active_ingredient: string | null;
+  dosage: string | null;
+  expiry_date: string | null;
+  quantity: number;
+  is_active: boolean;
+  schedules: {
+    id: string;
+    times: string[];
+    notes: string | null;
+  }[];
+};
+
+type DoseItem = {
+  id: string;
+  medicineId: string;
+  name: string;
+  dosage: string | null;
+  notes: string | null;
+  time: string;
+  taken: boolean;
+};
+
 export default function DashboardPage() {
-  const [takenIds, setTakenIds] = useState<string[]>(["m1-08:00", "m6-08:00"]);
-  const doses = useMemo(() => getTodayDoses(mockMedicines, takenIds), [takenIds]);
-  const activeMeds = mockMedicines.filter((m) => m.isActive);
+  const [medicines, setMedicines] = useState<MedicineWithSchedule[]>([]);
+  const [userName, setUserName] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [takenIds, setTakenIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    async function load() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+
+      setUserName(profile?.full_name || user.user_metadata?.full_name || "Kullanıcı");
+
+      const { data: meds } = await supabase
+        .from("medicines")
+        .select("id, name, active_ingredient, dosage, expiry_date, quantity, is_active, schedules(id, times, notes)")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (meds) setMedicines(meds as MedicineWithSchedule[]);
+      setLoading(false);
+    }
+    load();
+  }, []);
+
+  const doses = useMemo(() => {
+    const list: DoseItem[] = [];
+    medicines.filter((m) => m.is_active).forEach((m) => {
+      m.schedules?.forEach((s) => {
+        s.times?.forEach((t) => {
+          list.push({
+            id: `${m.id}-${t}`,
+            medicineId: m.id,
+            name: m.name,
+            dosage: m.dosage,
+            notes: s.notes,
+            time: t.slice(0, 5),
+            taken: takenIds.includes(`${m.id}-${t}`),
+          });
+        });
+      });
+    });
+    list.sort((a, b) => a.time.localeCompare(b.time));
+    return list;
+  }, [medicines, takenIds]);
+
+  const activeMeds = medicines.filter((m) => m.is_active);
   const taken = doses.filter((d) => d.taken).length;
   const total = doses.length;
   const adherence = total > 0 ? Math.round((taken / total) * 100) : 0;
-  const expiringSoon = mockMedicines
-    .filter((m) => daysUntil(m.expiryDate) < 90)
-    .sort((a, b) => daysUntil(a.expiryDate) - daysUntil(b.expiryDate));
+  const expiringSoon = medicines
+    .filter((m) => m.expiry_date && daysUntil(m.expiry_date) < 90)
+    .sort((a, b) => daysUntil(a.expiry_date!) - daysUntil(b.expiry_date!));
   const today = new Date();
 
   function toggleDose(id: string) {
@@ -40,21 +110,31 @@ export default function DashboardPage() {
     const dose = doses.find((d) => d.id === id);
     if (dose) {
       toast.success(
-        dose.taken ? "İşaret kaldırıldı" : `${dose.med.name} alındı olarak işaretlendi`
+        dose.taken ? "İşaret kaldırıldı" : `${dose.name} alındı olarak işaretlendi`
       );
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Loader2 className="w-8 h-8 animate-spin text-brand" />
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
-      {/* Topbar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-4 sm:gap-6 w-full">
         <div className="min-w-0">
           <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">
-            Günaydın, Ayşe 👋
+            Merhaba, {userName.split(" ")[0]} 👋
           </h1>
           <p className="text-muted-foreground text-base m-0">
-            Bugün {trDate(today)} — {trWeekday(today)}. Bugün {total} doz almanız gerekiyor.
+            Bugün {trDate(today)} — {trWeekday(today)}.{" "}
+            {total > 0
+              ? `Bugün ${total} doz almanız gerekiyor.`
+              : "Henüz ilaç planınız yok."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:ml-auto">
@@ -63,7 +143,6 @@ export default function DashboardPage() {
             className="relative w-11 h-11 rounded-xl bg-card border border-border flex items-center justify-center text-muted-foreground hover:border-border hover:text-foreground transition-colors"
           >
             <Bell className="w-5 h-5" />
-            <span className="absolute top-[9px] right-[9px] w-[9px] h-[9px] rounded-full bg-rose border-2 border-card" />
           </Link>
           <Link
             href="/dashboard/add-medicine"
@@ -74,7 +153,6 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stat cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-[18px] mb-6">
         <StatCard
           icon={<Pill className="w-[22px] h-[22px]" />}
@@ -99,9 +177,7 @@ export default function DashboardPage() {
         />
       </div>
 
-      {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)] gap-5">
-        {/* Today's doses */}
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -112,47 +188,52 @@ export default function DashboardPage() {
               Takvimi gör →
             </Link>
           </div>
-          <div className="flex flex-col gap-2.5">
-            {doses.map((d, i) => {
-              const isNext = !d.taken && doses.slice(0, i).every((x) => x.taken);
-              return (
-                <div
-                  key={d.id}
-                  className={`grid grid-cols-[78px_1fr_auto] gap-4 items-center px-4 py-3.5 rounded-[14px] border transition-all ${
-                    d.taken
-                      ? "bg-secondary/60 border-border opacity-55"
-                      : isNext
-                      ? "bg-brand-soft border-[oklch(0.88_0.05_220)]"
-                      : "bg-secondary border-border"
-                  }`}
-                >
-                  <div className="font-extrabold text-xl tracking-tight">{d.time}</div>
-                  <div>
-                    <div className={`font-bold text-base ${d.taken ? "line-through decoration-muted-foreground" : ""}`}>
-                      {d.med.name}{" "}
-                      <span className="text-muted-foreground font-medium text-sm">· {d.med.dosage}</span>
-                    </div>
-                    <div className="text-[13px] text-muted-foreground">{d.med.notes}</div>
-                  </div>
-                  <button
-                    onClick={() => toggleDose(d.id)}
-                    className={`w-[42px] h-[42px] rounded-full border-2 flex items-center justify-center transition-colors ${
+          {doses.length === 0 ? (
+            <div className="text-center py-10 text-muted-foreground">
+              Henüz aktif ilaç planınız yok.{" "}
+              <Link href="/dashboard/add-medicine" className="text-brand font-bold hover:underline">İlaç ekleyin</Link>
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2.5">
+              {doses.map((d, i) => {
+                const isNext = !d.taken && doses.slice(0, i).every((x) => x.taken);
+                return (
+                  <div
+                    key={d.id}
+                    className={`grid grid-cols-[78px_1fr_auto] gap-4 items-center px-4 py-3.5 rounded-[14px] border transition-all ${
                       d.taken
-                        ? "bg-mint border-mint text-white"
-                        : "border-border bg-card text-muted-foreground hover:border-mint hover:text-mint-ink"
+                        ? "bg-secondary/60 border-border opacity-55"
+                        : isNext
+                        ? "bg-brand-soft border-[oklch(0.88_0.05_220)]"
+                        : "bg-secondary border-border"
                     }`}
                   >
-                    <Check className="w-[18px] h-[18px]" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                    <div className="font-extrabold text-xl tracking-tight">{d.time}</div>
+                    <div>
+                      <div className={`font-bold text-base ${d.taken ? "line-through decoration-muted-foreground" : ""}`}>
+                        {d.name}{" "}
+                        {d.dosage && <span className="text-muted-foreground font-medium text-sm">· {d.dosage}</span>}
+                      </div>
+                      {d.notes && <div className="text-[13px] text-muted-foreground">{d.notes}</div>}
+                    </div>
+                    <button
+                      onClick={() => toggleDose(d.id)}
+                      className={`w-[42px] h-[42px] rounded-full border-2 flex items-center justify-center transition-colors ${
+                        d.taken
+                          ? "bg-mint border-mint text-white"
+                          : "border-border bg-card text-muted-foreground hover:border-mint hover:text-mint-ink"
+                      }`}
+                    >
+                      <Check className="w-[18px] h-[18px]" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
-        {/* Right column */}
         <div className="flex flex-col gap-5">
-          {/* Expiry warnings */}
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-bold text-lg tracking-tight m-0">SKT uyarıları</h3>
@@ -165,7 +246,7 @@ export default function DashboardPage() {
             ) : (
               <div>
                 {expiringSoon.slice(0, 4).map((m) => {
-                  const days = daysUntil(m.expiryDate);
+                  const days = daysUntil(m.expiry_date!);
                   const status = expiryStatus(days);
                   return (
                     <div key={m.id} className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl">
@@ -183,7 +264,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="font-bold text-[15px]">{m.name}</div>
                         <div className="text-[13px] text-muted-foreground">
-                          SKT: {trDate(new Date(m.expiryDate))}
+                          SKT: {trDate(new Date(m.expiry_date!))}
                         </div>
                       </div>
                     </div>
@@ -193,7 +274,6 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Weekly insight card */}
           <div
             className="rounded-2xl p-6 border"
             style={{
@@ -206,9 +286,13 @@ export default function DashboardPage() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-[17px] m-0 mb-1.5">Haftalık uyum: %94</h3>
+                <h3 className="font-bold text-[17px] m-0 mb-1.5">Haftalık uyum: %{adherence}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed m-0 mb-3">
-                  Geçen hafta ilaçlarınızı zamanında almakta harikaydınız. Devam edin!
+                  {adherence >= 80
+                    ? "İlaçlarınızı düzenli almaya devam edin!"
+                    : adherence > 0
+                    ? "Dozlarınızı zamanında almayı unutmayın."
+                    : "İlaç ekleyerek takibe başlayın."}
                 </p>
                 <Link
                   href="/dashboard/schedule"

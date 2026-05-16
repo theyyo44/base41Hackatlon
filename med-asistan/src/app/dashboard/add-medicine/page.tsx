@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Camera, Pencil, Sparkles, Clock, X, Check, Bell } from "lucide-react";
+import { useState, useRef } from "react";
+import { Camera, Pencil, Sparkles, Clock, X, Check, Bell, Upload, ImageIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -10,9 +10,17 @@ import { trDate } from "@/lib/helpers";
 export default function AddMedicinePage() {
   const router = useRouter();
   const [step, setStep] = useState<"choose" | "photo" | "form">("choose");
-  const [photoBusy, setPhotoBusy] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [dragOver, setDragOver] = useState(false);
+
+  const [coverPreview, setCoverPreview] = useState<string | null>(null);
+  const [expiryPreview, setExpiryPreview] = useState<string | null>(null);
+  const [coverBase64, setCoverBase64] = useState<string | null>(null);
+  const [expiryBase64, setExpiryBase64] = useState<string | null>(null);
+
+  const coverRef = useRef<HTMLInputElement>(null);
+  const expiryRef = useRef<HTMLInputElement>(null);
+
   const [form, setForm] = useState({
     name: "",
     activeIngredient: "",
@@ -39,21 +47,65 @@ export default function AddMedicinePage() {
     set("times", form.times.filter((_, j) => j !== i));
   }
 
-  function fakeOCR() {
-    setPhotoBusy(true);
-    setTimeout(() => {
+  function handleFileSelect(
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: "cover" | "expiry"
+  ) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Dosya 10MB'dan küçük olmalı");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      if (type === "cover") {
+        setCoverPreview(result);
+        setCoverBase64(result);
+      } else {
+        setExpiryPreview(result);
+        setExpiryBase64(result);
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function analyzePhotos() {
+    if (!coverBase64 || !expiryBase64) {
+      toast.error("Lütfen her iki fotoğrafı da yükleyin");
+      return;
+    }
+    setAnalyzing(true);
+    try {
+      const res = await fetch("/api/analyze-medicine", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          coverImage: coverBase64,
+          expiryImage: expiryBase64,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Analiz başarısız");
+        setAnalyzing(false);
+        return;
+      }
       setForm((f) => ({
         ...f,
-        name: "Parol",
-        activeIngredient: "Parasetamol 500mg",
-        dosage: "1 tablet",
-        expiryDate: "2026-12-15",
-        quantity: 20,
+        name: data.name || f.name,
+        activeIngredient: data.activeIngredient || f.activeIngredient,
+        dosage: data.dosage || f.dosage,
+        expiryDate: data.expiryDate || f.expiryDate,
+        quantity: data.quantity || f.quantity,
       }));
-      setPhotoBusy(false);
+      toast.success("Fotoğraflar analiz edildi — bilgiler dolduruldu");
       setStep("form");
-      toast.success("Fotoğraf analiz edildi — bilgiler dolduruldu");
-    }, 1600);
+    } catch {
+      toast.error("Analiz sırasında bir hata oluştu");
+    }
+    setAnalyzing(false);
   }
 
   async function submit() {
@@ -116,6 +168,7 @@ export default function AddMedicinePage() {
         <p className="text-muted-foreground text-base m-0">Kutunun fotoğrafını çekin veya bilgileri elle girin</p>
       </div>
 
+      {/* Step: Choose */}
       {step === "choose" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] max-w-[880px]">
           <button
@@ -127,10 +180,10 @@ export default function AddMedicinePage() {
             </div>
             <h3 className="font-bold text-xl m-0 mb-1.5">Fotoğrafla Ekle</h3>
             <p className="text-muted-foreground text-[15px] leading-relaxed m-0">
-              İlaç kutusunun fotoğrafını çekin. Yapay zeka isim, etken madde ve son kullanım tarihini otomatik okusun.
+              İlaç kutusunun kapak ve SKT fotoğrafını çekin. Yapay zeka bilgileri otomatik okusun.
             </p>
             <div className="mt-[18px] inline-flex items-center gap-1.5 text-brand font-bold text-sm">
-              <Sparkles className="w-3.5 h-3.5" /> Önerilen
+              <Sparkles className="w-3.5 h-3.5" /> Gemini AI ile analiz
             </div>
           </button>
           <button
@@ -148,59 +201,142 @@ export default function AddMedicinePage() {
         </div>
       )}
 
+      {/* Step: Photo */}
       {step === "photo" && (
-        <div className="max-w-[720px]">
-          <div
-            className={`border-2 border-dashed rounded-[18px] p-9 text-center cursor-pointer transition-all ${
-              dragOver ? "border-brand bg-brand-soft" : "border-muted-foreground/30 bg-secondary hover:border-brand/50"
-            }`}
-            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-            onDragLeave={() => setDragOver(false)}
-            onDrop={(e) => { e.preventDefault(); setDragOver(false); fakeOCR(); }}
-            onClick={fakeOCR}
-          >
-            {photoBusy ? (
-              <>
-                <div className="w-[72px] h-[72px] rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-3.5 text-brand animate-pulse">
-                  <Sparkles className="w-8 h-8" />
+        <div className="max-w-[780px]">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[18px] mb-6">
+            {/* Cover photo */}
+            <div>
+              <label className="text-sm font-bold text-muted-foreground mb-2 block">
+                1. Kapak / Ön Yüz
+              </label>
+              <input
+                ref={coverRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleFileSelect(e, "cover")}
+              />
+              {coverPreview ? (
+                <div className="relative rounded-[18px] overflow-hidden border-2 border-brand bg-secondary">
+                  <img src={coverPreview} alt="Kapak" className="w-full h-[220px] object-cover" />
+                  <button
+                    onClick={() => { setCoverPreview(null); setCoverBase64(null); if (coverRef.current) coverRef.current.value = ""; }}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                    Kapak fotoğrafı
+                  </div>
                 </div>
-                <h4 className="font-bold text-lg m-0 mb-1.5">Fotoğraf analiz ediliyor…</h4>
-                <p className="text-muted-foreground text-sm m-0">Yapay zeka kutunun üzerindeki bilgileri okuyor.</p>
-              </>
-            ) : (
-              <>
-                <div className="w-[72px] h-[72px] rounded-full bg-card border border-border flex items-center justify-center mx-auto mb-3.5 text-brand">
-                  <Camera className="w-8 h-8" />
+              ) : (
+                <button
+                  onClick={() => coverRef.current?.click()}
+                  className="w-full h-[220px] border-2 border-dashed border-muted-foreground/30 rounded-[18px] bg-secondary hover:border-brand/50 transition-all flex flex-col items-center justify-center gap-3"
+                >
+                  <div className="w-14 h-14 rounded-full bg-card border border-border flex items-center justify-center text-brand">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">Kapak fotoğrafı</div>
+                    <div className="text-xs text-muted-foreground">Tıkla veya kamerayla çek</div>
+                  </div>
+                </button>
+              )}
+            </div>
+
+            {/* Expiry photo */}
+            <div>
+              <label className="text-sm font-bold text-muted-foreground mb-2 block">
+                2. Son Kullanma Tarihi
+              </label>
+              <input
+                ref={expiryRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => handleFileSelect(e, "expiry")}
+              />
+              {expiryPreview ? (
+                <div className="relative rounded-[18px] overflow-hidden border-2 border-brand bg-secondary">
+                  <img src={expiryPreview} alt="SKT" className="w-full h-[220px] object-cover" />
+                  <button
+                    onClick={() => { setExpiryPreview(null); setExpiryBase64(null); if (expiryRef.current) expiryRef.current.value = ""; }}
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="absolute bottom-2 left-2 bg-black/50 text-white text-xs font-bold px-2.5 py-1 rounded-lg">
+                    SKT fotoğrafı
+                  </div>
                 </div>
-                <h4 className="font-bold text-lg m-0 mb-1.5">Fotoğraf çekin veya yükleyin</h4>
-                <p className="text-muted-foreground text-sm m-0">
-                  Sürükle-bırak yapabilir veya tıklayarak seçebilirsiniz.<br />JPG, PNG · Max 10 MB
-                </p>
-              </>
-            )}
+              ) : (
+                <button
+                  onClick={() => expiryRef.current?.click()}
+                  className="w-full h-[220px] border-2 border-dashed border-muted-foreground/30 rounded-[18px] bg-secondary hover:border-brand/50 transition-all flex flex-col items-center justify-center gap-3"
+                >
+                  <div className="w-14 h-14 rounded-full bg-card border border-border flex items-center justify-center text-amber">
+                    <ImageIcon className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <div className="font-bold text-sm">SKT fotoğrafı</div>
+                    <div className="text-xs text-muted-foreground">Tıkla veya kamerayla çek</div>
+                  </div>
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex gap-3 mt-5 flex-wrap">
-            <button onClick={fakeOCR} disabled={photoBusy} className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors disabled:opacity-50">
-              <Camera className="w-[18px] h-[18px]" /> Kameradan Çek
+
+          {/* Action buttons */}
+          <div className="flex gap-3 flex-wrap">
+            <button
+              onClick={analyzePhotos}
+              disabled={analyzing || !coverBase64 || !expiryBase64}
+              className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors disabled:opacity-50"
+            >
+              {analyzing ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  Analiz ediliyor…
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-[18px] h-[18px]" /> Fotoğrafları Analiz Et
+                </>
+              )}
             </button>
-            <button onClick={() => setStep("form")} className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-card border border-border font-bold hover:bg-secondary transition-colors">
+            <button
+              onClick={() => setStep("form")}
+              className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-card border border-border font-bold hover:bg-secondary transition-colors"
+            >
               Elle Girmeye Geç
             </button>
-            <button onClick={() => setStep("choose")} className="ml-auto inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-card border border-border font-bold hover:bg-secondary transition-colors">
+            <button
+              onClick={() => { setStep("choose"); setCoverPreview(null); setExpiryPreview(null); setCoverBase64(null); setExpiryBase64(null); }}
+              className="ml-auto inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-card border border-border font-bold hover:bg-secondary transition-colors"
+            >
               Geri
             </button>
           </div>
+
+          {/* Tips */}
           <div className="bg-brand-soft border border-[oklch(0.9_0.04_220)] rounded-2xl p-5 mt-6">
             <div className="flex gap-3 items-start">
               <Sparkles className="w-5 h-5 text-brand-ink shrink-0 mt-0.5" />
               <div className="text-sm text-muted-foreground leading-relaxed">
-                <strong className="text-foreground">İpucu:</strong> Kutuyu iyi aydınlatılmış bir alana koyun ve yazıların net görünmesine dikkat edin.
+                <strong className="text-foreground">İpucu:</strong> İyi aydınlatılmış bir ortamda çekin.
+                Birinci fotoğrafta ilaç adı ve etken madde, ikinci fotoğrafta son kullanma tarihi net görünmeli.
+                Gemini AI bilgileri otomatik tanıyacak.
               </div>
             </div>
           </div>
         </div>
       )}
 
+      {/* Step: Form */}
       {step === "form" && (
         <div className="grid grid-cols-1 lg:grid-cols-[1.4fr_1fr] gap-6 items-start max-w-[1100px]">
           <div className="bg-card border border-border rounded-2xl p-6">
@@ -290,7 +426,23 @@ export default function AddMedicinePage() {
             </div>
           </div>
 
+          {/* Preview sidebar */}
           <div className="flex flex-col gap-[18px]">
+            {/* Photo previews if available */}
+            {(coverPreview || expiryPreview) && (
+              <div className="bg-card border border-border rounded-2xl p-6">
+                <div className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase mb-3.5">Yüklenen Fotoğraflar</div>
+                <div className="grid grid-cols-2 gap-2.5">
+                  {coverPreview && (
+                    <img src={coverPreview} alt="Kapak" className="w-full h-[100px] object-cover rounded-xl" />
+                  )}
+                  {expiryPreview && (
+                    <img src={expiryPreview} alt="SKT" className="w-full h-[100px] object-cover rounded-xl" />
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="bg-card border border-border rounded-2xl p-6">
               <div className="text-[13px] font-bold tracking-widest text-muted-foreground uppercase mb-3.5">Önizleme</div>
               <div className="flex items-center gap-3.5 mb-3.5">
@@ -310,7 +462,11 @@ export default function AddMedicinePage() {
                 <span className="text-muted-foreground">Adet:</span>
                 <span className="font-semibold">{form.quantity}</span>
                 <span className="text-muted-foreground">SKT:</span>
-                <span className="font-semibold">{form.expiryDate ? trDate(new Date(form.expiryDate)) : "—"}</span>
+                <span className="font-semibold">{form.expiryDate && !isNaN(new Date(form.expiryDate).getTime()) ? trDate(new Date(form.expiryDate)) : "—"}</span>
+                <span className="text-muted-foreground">Durum:</span>
+                <span className={`font-semibold ${form.isActive ? "text-mint-ink" : "text-muted-foreground"}`}>
+                  {form.isActive ? "Aktif kullanımda" : "Pasif"}
+                </span>
               </div>
             </div>
             <div className="bg-card border border-border rounded-2xl p-6">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Camera, Pencil, Sparkles, Clock, X, Check, Bell, Upload, ImageIcon } from "lucide-react";
+import { Camera, Pencil, Sparkles, Clock, X, Check, Bell, ImageIcon, Sun, Sunset, Moon } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -29,7 +29,7 @@ export default function AddMedicinePage() {
     quantity: 1,
     isActive: true,
     notes: "",
-    times: ["08:00"],
+    times: ["09:00"],
     startDate: new Date().toISOString().slice(0, 10),
     endDate: "",
   });
@@ -38,13 +38,17 @@ export default function AddMedicinePage() {
     setForm((f) => ({ ...f, [k]: v }));
   }
 
-  function addTime() {
-    const t = prompt("Saat (örn. 08:00):", "12:00");
-    if (t && /^\d{1,2}:\d{2}$/.test(t)) set("times", [...form.times, t]);
-  }
+  const timeSlots = [
+    { key: "sabah", label: "Sabah", time: "09:00", icon: Sun },
+    { key: "ogle", label: "Öğle", time: "14:00", icon: Sunset },
+    { key: "aksam", label: "Akşam", time: "20:00", icon: Moon },
+  ] as const;
 
-  function removeTime(i: number) {
-    set("times", form.times.filter((_, j) => j !== i));
+  function toggleTimeSlot(time: string) {
+    set("times", form.times.includes(time)
+      ? form.times.filter((t) => t !== time)
+      : [...form.times, time].sort()
+    );
   }
 
   function handleFileSelect(
@@ -373,17 +377,27 @@ export default function AddMedicinePage() {
 
             <h3 className="font-bold text-lg m-0 mb-[18px] mt-6 pt-6 border-t border-border">Kullanım Planı</h3>
             <div className="flex flex-col gap-2 mb-[18px]">
-              <label className="text-sm font-bold text-muted-foreground">Günde alınacak saatler</label>
-              <div className="flex flex-wrap gap-2.5 items-center">
-                {form.times.map((t, i) => (
-                  <span key={i} className="inline-flex items-center gap-2 px-3.5 py-2.5 bg-brand-soft text-brand-ink rounded-full font-bold text-[15px]">
-                    <Clock className="w-3.5 h-3.5" /> {t}
-                    <button onClick={() => removeTime(i)} className="opacity-65 hover:opacity-100"><X className="w-3.5 h-3.5" /></button>
-                  </span>
-                ))}
-                <button onClick={addTime} className="px-4 py-2.5 border-[1.5px] border-dashed border-muted-foreground/40 rounded-full text-muted-foreground font-semibold text-sm hover:border-brand hover:text-brand transition-colors">
-                  + Saat Ekle
-                </button>
+              <label className="text-sm font-bold text-muted-foreground">Günde alınacak zamanlar</label>
+              <div className="grid grid-cols-3 gap-3">
+                {timeSlots.map((slot) => {
+                  const active = form.times.includes(slot.time);
+                  return (
+                    <button
+                      key={slot.key}
+                      type="button"
+                      onClick={() => toggleTimeSlot(slot.time)}
+                      className={`flex flex-col items-center gap-2 py-4 rounded-xl border-2 font-bold transition-all ${
+                        active
+                          ? "bg-brand-soft border-brand text-brand-ink"
+                          : "bg-card border-border text-muted-foreground hover:border-brand/40"
+                      }`}
+                    >
+                      <slot.icon className="w-6 h-6" />
+                      <span className="text-[15px]">{slot.label}</span>
+                      <span className="text-xs font-semibold opacity-70">{slot.time}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
             <div className="grid grid-cols-2 gap-3.5 mb-[18px]">

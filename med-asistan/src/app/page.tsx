@@ -10,6 +10,7 @@ import {
   Shield,
   Check,
   X,
+  Activity,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
@@ -41,6 +42,7 @@ export default function LandingPage() {
   const [regName, setRegName] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [regRole, setRegRole] = useState<"patient" | "doctor">("patient");
 
   function switchView(next: View) {
     if (next === displayView) return;
@@ -66,7 +68,7 @@ export default function LandingPage() {
     }
     setLoading(true);
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email: loginEmail.trim().toLowerCase(),
       password: loginPassword,
     });
@@ -76,6 +78,17 @@ export default function LandingPage() {
       return;
     }
     toast.success("Giriş başarılı!");
+    if (data.user) {
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .single();
+      if (profile?.role === "doctor") {
+        router.push("/doctor-dashboard");
+        return;
+      }
+    }
     router.push("/dashboard");
   }
 
@@ -95,7 +108,7 @@ export default function LandingPage() {
       email: regEmail.trim().toLowerCase(),
       password: regPassword,
       options: {
-        data: { full_name: regName.trim() },
+        data: { full_name: regName.trim(), role: regRole },
       },
     });
     if (error) {
@@ -113,13 +126,18 @@ export default function LandingPage() {
         id: data.user.id,
         full_name: regName.trim(),
         email: regEmail.trim().toLowerCase(),
+        role: regRole,
       });
       if (profileError) {
         toast.error("Profil kaydedilemedi: " + profileError.message);
       }
     }
     toast.success("Hesap oluşturuldu!");
-    router.push("/dashboard");
+    if (regRole === "doctor") {
+      router.push("/doctor-onboarding");
+    } else {
+      router.push("/dashboard");
+    }
   }
 
   const cardAnimation = animatingOut
@@ -346,6 +364,32 @@ export default function LandingPage() {
             <p className="text-muted-foreground text-[15px] mb-8">Bir dakika içinde hazır. E-postanızla başlayın.</p>
 
             <form onSubmit={handleRegister} className="flex flex-col gap-6">
+              {/* Role selector */}
+              <div className="grid grid-cols-2 gap-2 p-1 bg-secondary rounded-xl">
+                <button
+                  type="button"
+                  onClick={() => setRegRole("patient")}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${
+                    regRole === "patient"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Heart className={`w-4 h-4 ${regRole === "patient" ? "fill-brand text-brand" : ""}`} /> Hasta
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRegRole("doctor")}
+                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${
+                    regRole === "doctor"
+                      ? "bg-card text-foreground shadow-sm"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Activity className={`w-4 h-4 ${regRole === "doctor" ? "text-brand" : ""}`} /> Doktor
+                </button>
+              </div>
+
               <div>
                 <label className="text-[11px] font-bold tracking-[0.08em] uppercase text-muted-foreground mb-3 block">AD SOYAD</label>
                 <input

@@ -10,6 +10,8 @@ import {
   Plus,
   Sparkles,
   Loader2,
+  Stethoscope,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -46,6 +48,9 @@ export default function DashboardPage() {
   const [userName, setUserName] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [takenIds, setTakenIds] = useState<string[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<
+    { id: string; doctorName: string; note: string | null }[]
+  >([]);
 
   useEffect(() => {
     async function load() {
@@ -68,6 +73,32 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false });
 
       if (meds) setMedicines(meds as MedicineWithSchedule[]);
+
+      // Fetch pending doctor invites
+      const { data: invites } = await supabase
+        .from("doctor_patients")
+        .select("id, doctor_id, notes")
+        .eq("patient_id", user.id)
+        .eq("status", "pending");
+
+      if (invites && invites.length > 0) {
+        const doctorIds = invites.map((i) => i.doctor_id);
+        const { data: doctors } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", doctorIds);
+        const doctorMap = new Map(
+          (doctors || []).map((d) => [d.id, `Dr. ${d.full_name}`])
+        );
+        setPendingInvites(
+          invites.map((i) => ({
+            id: i.id,
+            doctorName: doctorMap.get(i.doctor_id) || "Doktor",
+            note: i.notes,
+          }))
+        );
+      }
+
       setLoading(false);
     }
     load();
@@ -115,6 +146,24 @@ export default function DashboardPage() {
     }
   }
 
+  async function respondInvite(inviteId: string, accept: boolean) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("doctor_patients")
+      .update({
+        status: accept ? "active" : "ended",
+        accepted_at: accept ? new Date().toISOString() : null,
+        ended_at: accept ? null : new Date().toISOString(),
+      })
+      .eq("id", inviteId);
+    if (error) {
+      toast.error("İşlem başarısız: " + error.message);
+      return;
+    }
+    toast.success(accept ? "Davet kabul edildi!" : "Davet reddedildi.");
+    setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
@@ -125,6 +174,37 @@ export default function DashboardPage() {
 
   return (
     <div className="w-full">
+      {/* Doctor invite banners */}
+      {pendingInvites.map((inv) => (
+        <div
+          key={inv.id}
+          className="mb-5 bg-gradient-to-r from-[oklch(0.95_0.04_165)] to-[oklch(0.96_0.03_200)] border border-[oklch(0.88_0.06_165)] rounded-2xl p-5 flex flex-wrap items-center gap-4"
+        >
+          <div className="w-12 h-12 rounded-[14px] bg-[oklch(0.55_0.13_165)] text-white flex items-center justify-center shrink-0">
+            <Stethoscope className="w-6 h-6" />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <div className="font-bold text-[15px]">{inv.doctorName} sizi izlemek istiyor</div>
+            {inv.note && (
+              <p className="text-sm text-muted-foreground mt-0.5 leading-snug">{inv.note}</p>
+            )}
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => respondInvite(inv.id, true)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[oklch(0.55_0.13_165)] text-white font-bold text-sm"
+            >
+              <Check className="w-4 h-4" /> Kabul Et
+            </button>
+            <button
+              onClick={() => respondInvite(inv.id, false)}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border font-bold text-sm hover:bg-secondary transition-colors"
+            >
+              <X className="w-4 h-4" /> Reddet
+            </button>
+          </div>
+        </div>
+      ))}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-4 sm:gap-6 w-full">
         <div className="min-w-0">
           <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">

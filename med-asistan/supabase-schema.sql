@@ -26,12 +26,24 @@ create table medicines (
 -- Kullanım planı
 create table schedules (
   id uuid primary key default gen_random_uuid(),
-  medicine_id uuid references medicines not null,
+  medicine_id uuid references medicines on delete cascade not null,
   user_id uuid references auth.users not null,
   times time[] not null,
   start_date date not null,
   end_date date,
   notes text,
+  created_at timestamp default now()
+);
+
+-- Doz kayitlari
+create table dose_logs (
+  id uuid primary key default gen_random_uuid(),
+  schedule_id uuid references schedules on delete cascade not null,
+  user_id uuid references auth.users not null,
+  dose_date date not null,
+  dose_time time not null,
+  is_taken boolean default false,
+  taken_at timestamp,
   created_at timestamp default now()
 );
 
@@ -50,6 +62,7 @@ create table notifications (
 alter table profiles enable row level security;
 alter table medicines enable row level security;
 alter table schedules enable row level security;
+alter table dose_logs enable row level security;
 alter table notifications enable row level security;
 
 create policy "Users can view own profile" on profiles for select using (auth.uid() = id);
@@ -65,6 +78,11 @@ create policy "Users can view own schedules" on schedules for select using (auth
 create policy "Users can insert own schedules" on schedules for insert with check (auth.uid() = user_id);
 create policy "Users can update own schedules" on schedules for update using (auth.uid() = user_id);
 create policy "Users can delete own schedules" on schedules for delete using (auth.uid() = user_id);
+
+create policy "Users can view own dose logs" on dose_logs for select using (auth.uid() = user_id);
+create policy "Users can insert own dose logs" on dose_logs for insert with check (auth.uid() = user_id);
+create policy "Users can update own dose logs" on dose_logs for update using (auth.uid() = user_id);
+create policy "Users can delete own dose logs" on dose_logs for delete using (auth.uid() = user_id);
 
 create policy "Users can view own notifications" on notifications for select using (auth.uid() = user_id);
 create policy "Users can update own notifications" on notifications for update using (auth.uid() = user_id);

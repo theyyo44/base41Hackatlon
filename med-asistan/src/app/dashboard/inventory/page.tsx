@@ -25,11 +25,14 @@ export default function InventoryPage() {
   const [filter, setFilter] = useState<Filter>("all");
   const [medicines, setMedicines] = useState<Medicine[]>([]);
   const [loading, setLoading] = useState(true);
+  const [deletingIds, setDeletingIds] = useState<string[]>([]);
 
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return;
 
       const { data } = await supabase
@@ -51,7 +54,11 @@ export default function InventoryPage() {
     if (filter === "expiring") xs = xs.filter((m) => m.expiry_date && daysUntil(m.expiry_date) < 90);
     if (q.trim()) {
       const qq = q.toLowerCase();
-      xs = xs.filter((m) => m.name.toLowerCase().includes(qq) || (m.active_ingredient || "").toLowerCase().includes(qq));
+      xs = xs.filter(
+        (m) =>
+          m.name.toLowerCase().includes(qq) ||
+          (m.active_ingredient || "").toLowerCase().includes(qq)
+      );
     }
     return xs;
   }, [medicines, q, filter]);
@@ -61,7 +68,10 @@ export default function InventoryPage() {
     if (!med) return;
     const newVal = !med.is_active;
     const supabase = createClient();
-    const { error } = await supabase.from("medicines").update({ is_active: newVal }).eq("id", id);
+    const { error } = await supabase
+      .from("medicines")
+      .update({ is_active: newVal })
+      .eq("id", id);
     if (error) {
       toast.error("Güncelleme başarısız");
       return;
@@ -72,19 +82,31 @@ export default function InventoryPage() {
 
   async function deleteMed(id: string) {
     const med = medicines.find((m) => m.id === id);
-    if (!med) return;
-    const supabase = createClient();
-    await supabase.from("schedules").delete().eq("medicine_id", id);
-    const { error } = await supabase.from("medicines").delete().eq("id", id);
-    if (error) {
-      toast.error("Silme başarısız");
+    if (!med || deletingIds.includes(id)) return;
+
+    setDeletingIds((ids) => [...ids, id]);
+    const response = await fetch(`/api/medicines/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+
+    if (!response.ok) {
+      const data = await response.json().catch(() => null);
+      toast.error(data?.error || "Silme başarısız");
+      setDeletingIds((ids) => ids.filter((x) => x !== id));
       return;
     }
+
     setMedicines((ms) => ms.filter((m) => m.id !== id));
+    setDeletingIds((ids) => ids.filter((x) => x !== id));
     toast.success(`${med.name} silindi`);
   }
 
-  const filters: [Filter, string][] = [["all", "Tümü"], ["active", "Aktif"], ["passive", "Pasif"], ["expiring", "SKT yakın"]];
+  const filters: [Filter, string][] = [
+    ["all", "Tümü"],
+    ["active", "Aktif"],
+    ["passive", "Pasif"],
+    ["expiring", "SKT yakın"],
+  ];
 
   if (loading) {
     return (
@@ -144,6 +166,7 @@ export default function InventoryPage() {
               const days = m.expiry_date ? daysUntil(m.expiry_date) : 999;
               const status = expiryStatus(days);
               const timesPerDay = m.schedules?.reduce((sum, s) => sum + (s.times?.length || 0), 0) || 0;
+              const deleting = deletingIds.includes(m.id);
               return (
                 <tr key={m.id} className="hover:bg-secondary/50 transition-colors">
                   <td className="px-[18px] py-4 border-b border-border">
@@ -153,13 +176,13 @@ export default function InventoryPage() {
                       </div>
                       <div>
                         <div className="font-bold">{m.name}</div>
-                        <div className="text-[13px] text-muted-foreground">{m.active_ingredient || "—"}</div>
+                        <div className="text-[13px] text-muted-foreground">{m.active_ingredient || "-"}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-[18px] py-4 border-b border-border text-[15px]">
-                    {m.dosage || "—"}
-                    {timesPerDay > 0 && <div className="text-[13px] text-muted-foreground">{timesPerDay}× / gün</div>}
+                    {m.dosage || "-"}
+                    {timesPerDay > 0 && <div className="text-[13px] text-muted-foreground">{timesPerDay}x / gün</div>}
                   </td>
                   <td className="px-[18px] py-4 border-b border-border text-[15px]">
                     <strong>{m.quantity}</strong>
@@ -175,7 +198,7 @@ export default function InventoryPage() {
                           {status === "ok" && <span className="text-[13px] text-muted-foreground">{days} gün</span>}
                         </div>
                       </>
-                    ) : "—"}
+                    ) : "-"}
                   </td>
                   <td className="px-[18px] py-4 border-b border-border">
                     {m.is_active
@@ -188,9 +211,9 @@ export default function InventoryPage() {
                         className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors">
                         <Check className="w-4 h-4" />
                       </button>
-                      <button onClick={() => deleteMed(m.id)} title="Sil"
-                        className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-muted-foreground hover:bg-rose-soft hover:text-rose-ink transition-colors">
-                        <Trash2 className="w-4 h-4" />
+                      <button onClick={() => deleteMed(m.id)} title="Sil" disabled={deleting}
+                        className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-muted-foreground hover:bg-rose-soft hover:text-rose-ink transition-colors disabled:opacity-50 disabled:pointer-events-none">
+                        {deleting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
                       </button>
                     </div>
                   </td>

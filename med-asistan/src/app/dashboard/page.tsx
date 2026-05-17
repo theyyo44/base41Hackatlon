@@ -68,7 +68,7 @@ export default function DashboardPage() {
         .eq("id", user.id)
         .single();
 
-      setUserName(profile?.full_name || user.user_metadata?.full_name || "KullanÃ„Â±cÃ„Â±");
+      setUserName(profile?.full_name || user.user_metadata?.full_name || "Kullanıcı");
 
       const { data: meds } = await supabase
         .from("medicines")
@@ -206,10 +206,10 @@ export default function DashboardPage() {
         .eq("medicine_id", dose.medicineId)
         .eq("scheduled_at", scheduledAt.toISOString());
       if (error) {
-        toast.error("Ã„Â°Ã…Å¸aret kaldÃ„Â±rma baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
+        toast.error("İşaret kaldırma başarısız: " + error.message);
       } else {
         await adjustMedicineQuantity(dose.medicineId, +1);
-        toast.success("Ã„Â°Ã…Å¸aret kaldÃ„Â±rÃ„Â±ldÃ„Â±");
+        toast.success("İşaret kaldırıldı");
       }
     } else {
       const { data: existing } = await supabase
@@ -240,12 +240,12 @@ export default function DashboardPage() {
         }));
       }
       if (error) {
-        toast.error("KayÃ„Â±t baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
+        toast.error("Kayıt başarısız: " + error.message);
       } else {
         if (shouldDecreaseQuantity) {
           await adjustMedicineQuantity(dose.medicineId, -1);
         }
-        toast.success(`${dose.name} alÃ„Â±ndÃ„Â± olarak iÃ…Å¸aretlendi`);
+        toast.success(`${dose.name} alındı olarak işaretlendi`);
       }
     }
   }
@@ -261,7 +261,7 @@ export default function DashboardPage() {
       })
       .eq("id", inviteId);
     if (error) {
-      toast.error("Ã„Â°Ã…Å¸lem baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
+      toast.error("İşlem başarısız: " + error.message);
       return;
     }
     toast.success(accept ? "Davet kabul edildi!" : "Davet reddedildi.");

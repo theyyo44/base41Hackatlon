@@ -96,7 +96,6 @@ export function Sidebar({ userName, userEmail, unreadCount = 0, unreadMessages =
           </div>
           <div>
             <div className="font-extrabold text-xl tracking-tight leading-tight">MedAsistan</div>
-            <div className="text-xs text-muted-foreground font-medium -mt-0.5">Ev İlaç Takip Sistemi</div>
           </div>
         </div>
 

@@ -24,6 +24,7 @@ export default function AddMedicinePage() {
   const [form, setForm] = useState({
     name: "",
     activeIngredient: "",
+    formType: "tablet",
     dosage: "1 tablet",
     expiryDate: "",
     quantity: 1,
@@ -37,6 +38,19 @@ export default function AddMedicinePage() {
   function set<K extends keyof typeof form>(k: K, v: (typeof form)[K]) {
     setForm((f) => ({ ...f, [k]: v }));
   }
+
+  const dosageTemplateByForm: Record<string, string> = {
+    tablet: "1 tablet",
+    kapsul: "1 kapsul",
+    surup: "5 ml",
+    damla: "10 damla",
+    sprey: "1 puff",
+    krem: "Ince tabaka",
+    jel: "Ince tabaka",
+    ampul: "1 ampul",
+    flakon: "1 flakon",
+    diger: "1 doz",
+  };
 
   const timeSlots = [
     { key: "sabah", label: "Sabah", time: "09:00", icon: Sun },
@@ -100,7 +114,8 @@ export default function AddMedicinePage() {
         ...f,
         name: data.name || f.name,
         activeIngredient: data.activeIngredient || f.activeIngredient,
-        dosage: data.dosage || f.dosage,
+        formType: data.formType || f.formType,
+        dosage: data.dosage || dosageTemplateByForm[data.formType || f.formType] || f.dosage,
         expiryDate: data.expiryDate || f.expiryDate,
         quantity: data.quantity || f.quantity,
       }));
@@ -350,11 +365,37 @@ export default function AddMedicinePage() {
               <input type="text" value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Örn. Parol 500mg"
                 className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
             </div>
-            <div className="grid grid-cols-2 gap-3.5 mb-[18px]">
+            <div className="grid grid-cols-3 gap-3.5 mb-[18px]">
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Etken Madde</label>
                 <input type="text" value={form.activeIngredient} onChange={(e) => set("activeIngredient", e.target.value)} placeholder="Parasetamol 500mg"
                   className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className="text-sm font-bold text-muted-foreground">İlaç Formu</label>
+                <select
+                  value={form.formType}
+                  onChange={(e) => {
+                    const nextFormType = e.target.value;
+                    setForm((f) => ({
+                      ...f,
+                      formType: nextFormType,
+                      dosage: dosageTemplateByForm[nextFormType] || f.dosage,
+                    }));
+                  }}
+                  className="px-4 py-3 border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-brand focus:ring-4 focus:ring-brand/20 transition-all"
+                >
+                  <option value="tablet">Tablet</option>
+                  <option value="kapsul">Kapsül</option>
+                  <option value="surup">Şurup</option>
+                  <option value="damla">Damla</option>
+                  <option value="sprey">Sprey</option>
+                  <option value="krem">Krem</option>
+                  <option value="jel">Jel</option>
+                  <option value="ampul">Ampul</option>
+                  <option value="flakon">Flakon</option>
+                  <option value="diger">Diğer</option>
+                </select>
               </div>
               <div className="flex flex-col gap-2">
                 <label className="text-sm font-bold text-muted-foreground">Doz</label>

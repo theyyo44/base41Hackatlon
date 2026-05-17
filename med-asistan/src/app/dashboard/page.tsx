@@ -68,7 +68,7 @@ export default function DashboardPage() {
         .eq("id", user.id)
         .single();
 
-      setUserName(profile?.full_name || user.user_metadata?.full_name || "Kullanıcı");
+      setUserName(profile?.full_name || user.user_metadata?.full_name || "KullanÄ±cÄ±");
 
       const { data: meds } = await supabase
         .from("medicines")
@@ -160,6 +160,29 @@ export default function DashboardPage() {
     .sort((a, b) => daysUntil(a.expiry_date!) - daysUntil(b.expiry_date!));
   const today = new Date();
 
+  async function adjustMedicineQuantity(medicineId: string, delta: number) {
+    const supabase = createClient();
+    const { data: med, error: readError } = await supabase
+      .from("medicines")
+      .select("id, quantity")
+      .eq("id", medicineId)
+      .single();
+
+    if (readError || !med) return;
+
+    const nextQuantity = Math.max(0, (med.quantity ?? 0) + delta);
+    const { error: updateError } = await supabase
+      .from("medicines")
+      .update({ quantity: nextQuantity })
+      .eq("id", medicineId);
+
+    if (!updateError) {
+      setMedicines((prev) =>
+        prev.map((m) => (m.id === medicineId ? { ...m, quantity: nextQuantity } : m))
+      );
+    }
+  }
+
   async function toggleDose(id: string) {
     const dose = doses.find((d) => d.id === id);
     if (!dose || !userId) return;
@@ -182,8 +205,12 @@ export default function DashboardPage() {
         .eq("user_id", userId)
         .eq("medicine_id", dose.medicineId)
         .eq("scheduled_at", scheduledAt.toISOString());
-      if (error) toast.error("İşaret kaldırma başarısız: " + error.message);
-      toast.success("İşaret kaldırıldı");
+      if (error) {
+        toast.error("İşaret kaldırma başarısız: " + error.message);
+      } else {
+        await adjustMedicineQuantity(dose.medicineId, +1);
+        toast.success("İşaret kaldırıldı");
+      }
     } else {
       const { data: existing } = await supabase
         .from("dose_logs")
@@ -194,12 +221,15 @@ export default function DashboardPage() {
         .maybeSingle();
 
       let error;
+      let shouldDecreaseQuantity = false;
       if (existing) {
+        shouldDecreaseQuantity = existing.status !== "taken";
         ({ error } = await supabase
           .from("dose_logs")
           .update({ status: "taken", taken_at: new Date().toISOString() })
           .eq("id", existing.id));
       } else {
+        shouldDecreaseQuantity = true;
         ({ error } = await supabase.from("dose_logs").insert({
           user_id: userId,
           medicine_id: dose.medicineId,
@@ -212,6 +242,9 @@ export default function DashboardPage() {
       if (error) {
         toast.error("Kayıt başarısız: " + error.message);
       } else {
+        if (shouldDecreaseQuantity) {
+          await adjustMedicineQuantity(dose.medicineId, -1);
+        }
         toast.success(`${dose.name} alındı olarak işaretlendi`);
       }
     }
@@ -228,7 +261,7 @@ export default function DashboardPage() {
       })
       .eq("id", inviteId);
     if (error) {
-      toast.error("İşlem başarısız: " + error.message);
+      toast.error("Ä°ÅŸlem baÅŸarÄ±sÄ±z: " + error.message);
       return;
     }
     toast.success(accept ? "Davet kabul edildi!" : "Davet reddedildi.");
@@ -279,13 +312,13 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-4 sm:gap-6 w-full">
         <div className="min-w-0">
           <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">
-            Merhaba, {userName.split(" ")[0]} 👋
+            Merhaba, {userName.split(" ")[0]} ğŸ‘‹
           </h1>
           <p className="text-muted-foreground text-base m-0">
-            Bugün {trDate(today)} — {trWeekday(today)}.{" "}
+            BugÃ¼n {trDate(today)} â€” {trWeekday(today)}.{" "}
             {total > 0
-              ? `Bugün ${total} doz almanız gerekiyor.`
-              : "Henüz ilaç planınız yok."}
+              ? `BugÃ¼n ${total} doz almanÄ±z gerekiyor.`
+              : "HenÃ¼z ilaÃ§ planÄ±nÄ±z yok."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:ml-auto">
@@ -299,7 +332,7 @@ export default function DashboardPage() {
             href="/dashboard/add-medicine"
             className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold text-base shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors"
           >
-            <Plus className="w-[18px] h-[18px]" /> İlaç Ekle
+            <Plus className="w-[18px] h-[18px]" /> Ä°laÃ§ Ekle
           </Link>
         </div>
       </div>
@@ -309,22 +342,22 @@ export default function DashboardPage() {
           icon={<Pill className="w-[22px] h-[22px]" />}
           tone="blue"
           num={activeMeds.length}
-          label="Aktif ilaç"
-          foot={<><Check className="w-3.5 h-3.5" /> Düzenli kullanım</>}
+          label="Aktif ilaÃ§"
+          foot={<><Check className="w-3.5 h-3.5" /> DÃ¼zenli kullanÄ±m</>}
         />
         <StatCard
           icon={<Clock className="w-[22px] h-[22px]" />}
           tone="mint"
           num={`${taken}/${total}`}
-          label="Bugünkü doz"
-          foot={<>Uyum oranı: %{adherence}</>}
+          label="BugÃ¼nkÃ¼ doz"
+          foot={<>Uyum oranÄ±: %{adherence}</>}
         />
         <StatCard
           icon={<AlertTriangle className="w-[22px] h-[22px]" />}
           tone="amber"
           num={expiringSoon.length}
-          label="SKT uyarısı"
-          foot={<>90 gün içinde bozulacak</>}
+          label="SKT uyarÄ±sÄ±"
+          foot={<>90 gÃ¼n iÃ§inde bozulacak</>}
         />
       </div>
 
@@ -332,17 +365,17 @@ export default function DashboardPage() {
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-lg tracking-tight m-0">Bugünkü dozlar</h3>
-              <div className="text-[13px] text-muted-foreground mt-0.5">Aldığınız dozları işaretleyin</div>
+              <h3 className="font-bold text-lg tracking-tight m-0">BugÃ¼nkÃ¼ dozlar</h3>
+              <div className="text-[13px] text-muted-foreground mt-0.5">AldÄ±ÄŸÄ±nÄ±z dozlarÄ± iÅŸaretleyin</div>
             </div>
             <Link href="/dashboard/schedule" className="text-muted-foreground text-sm font-semibold hover:text-brand transition-colors">
-              Takvimi gör →
+              Takvimi gÃ¶r â†’
             </Link>
           </div>
           {doses.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              Henüz aktif ilaç planınız yok.{" "}
-              <Link href="/dashboard/add-medicine" className="text-brand font-bold hover:underline">İlaç ekleyin</Link>
+              HenÃ¼z aktif ilaÃ§ planÄ±nÄ±z yok.{" "}
+              <Link href="/dashboard/add-medicine" className="text-brand font-bold hover:underline">Ä°laÃ§ ekleyin</Link>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -363,7 +396,7 @@ export default function DashboardPage() {
                     <div>
                       <div className={`font-bold text-base ${d.taken ? "line-through decoration-muted-foreground" : ""}`}>
                         {d.name}{" "}
-                        {d.dosage && <span className="text-muted-foreground font-medium text-sm">· {d.dosage}</span>}
+                        {d.dosage && <span className="text-muted-foreground font-medium text-sm">Â· {d.dosage}</span>}
                       </div>
                       {d.notes && <div className="text-[13px] text-muted-foreground">{d.notes}</div>}
                     </div>
@@ -387,13 +420,13 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-5">
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg tracking-tight m-0">SKT uyarıları</h3>
+              <h3 className="font-bold text-lg tracking-tight m-0">SKT uyarÄ±larÄ±</h3>
               <Link href="/dashboard/inventory" className="text-muted-foreground text-sm font-semibold hover:text-brand transition-colors">
-                Tümü →
+                TÃ¼mÃ¼ â†’
               </Link>
             </div>
             {expiringSoon.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">Yaklaşan son kullanım tarihi yok.</div>
+              <div className="text-center py-10 text-muted-foreground">YaklaÅŸan son kullanÄ±m tarihi yok.</div>
             ) : (
               <div>
                 {expiringSoon.slice(0, 4).map((m) => {
@@ -437,19 +470,19 @@ export default function DashboardPage() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-[17px] m-0 mb-1.5">Haftalık uyum: %{adherence}</h3>
+                <h3 className="font-bold text-[17px] m-0 mb-1.5">HaftalÄ±k uyum: %{adherence}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed m-0 mb-3">
                   {adherence >= 80
-                    ? "İlaçlarınızı düzenli almaya devam edin!"
+                    ? "Ä°laÃ§larÄ±nÄ±zÄ± dÃ¼zenli almaya devam edin!"
                     : adherence > 0
-                    ? "Dozlarınızı zamanında almayı unutmayın."
-                    : "İlaç ekleyerek takibe başlayın."}
+                    ? "DozlarÄ±nÄ±zÄ± zamanÄ±nda almayÄ± unutmayÄ±n."
+                    : "Ä°laÃ§ ekleyerek takibe baÅŸlayÄ±n."}
                 </p>
                 <Link
                   href="/dashboard/schedule"
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-brand-soft text-brand-ink font-bold text-sm hover:bg-[oklch(0.94_0.03_220)] transition-colors"
                 >
-                  Detayları gör
+                  DetaylarÄ± gÃ¶r
                 </Link>
               </div>
             </div>
@@ -492,3 +525,4 @@ function StatCard({
     </div>
   );
 }
+

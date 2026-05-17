@@ -126,70 +126,77 @@ export default function DoctorDashboardPage() {
 
         if (visibleIds.length > 0) {
           const today = new Date();
+          const todayStart = new Date(today);
+          todayStart.setHours(0, 0, 0, 0);
+          const todayEnd = new Date(today);
+          todayEnd.setHours(23, 59, 59, 999);
+          const wStart = new Date(today);
+          wStart.setDate(wStart.getDate() - 6);
+          wStart.setHours(0, 0, 0, 0);
+
+          const [medsResult, doseLogsResult] = await Promise.all([
+            supabase
+              .from("medicines")
+              .select("id, user_id, is_active, schedules(times)")
+              .in("user_id", visibleIds)
+              .eq("is_active", true),
+            supabase
+              .from("dose_logs")
+              .select("user_id, status, scheduled_at")
+              .in("user_id", visibleIds)
+              .gte("scheduled_at", wStart.toISOString())
+              .lte("scheduled_at", todayEnd.toISOString()),
+          ]);
+
+          const allMeds = medsResult.data || [];
+          const allDoseLogs = doseLogsResult.data || [];
+
+          const medsByPatient = new Map<string, typeof allMeds>();
+          for (const m of allMeds) {
+            const arr = medsByPatient.get(m.user_id) || [];
+            arr.push(m);
+            medsByPatient.set(m.user_id, arr);
+          }
+
+          const doseLogsByPatient = new Map<string, typeof allDoseLogs>();
+          for (const d of allDoseLogs) {
+            const arr = doseLogsByPatient.get(d.user_id) || [];
+            arr.push(d);
+            doseLogsByPatient.set(d.user_id, arr);
+          }
 
           const patientList: Patient[] = [];
           for (const pid of visibleIds) {
             const p = profileMap.get(pid);
             if (!p) continue;
 
-            const { count: medsCount } = await supabase
-              .from("medicines")
-              .select("id", { count: "exact", head: true })
-              .eq("user_id", p.id)
-              .eq("is_active", true);
+            const pMeds = medsByPatient.get(p.id) || [];
+            const pLogs = doseLogsByPatient.get(p.id) || [];
+            const pStatus = statusMap.get(p.id) || "active";
 
             let adherence = 0;
             let hasTodayDoses = false;
             let tookToday = false;
-            const pStatus = statusMap.get(p.id) || "active";
-            if (pStatus === "active") {
-              const { data: medsWithSchedules } = await supabase
-                .from("medicines")
-                .select("id, schedules(times)")
-                .eq("user_id", p.id)
-                .eq("is_active", true);
 
+            if (pStatus === "active") {
               let totalDoses = 0;
-              const medTimes: { medId: string; time: string }[] = [];
-              for (const m of medsWithSchedules || []) {
+              let dailyDoseCount = 0;
+              for (const m of pMeds) {
                 const times = (m.schedules as any)?.[0]?.times || [];
-                for (const t of times) {
-                  medTimes.push({ medId: m.id, time: (t as string).slice(0, 5) });
-                }
+                dailyDoseCount += times.length;
                 totalDoses += times.length * 7;
               }
 
-              const todayStart = new Date(today);
-              todayStart.setHours(0, 0, 0, 0);
-              const todayEnd = new Date(today);
-              todayEnd.setHours(23, 59, 59, 999);
+              hasTodayDoses = dailyDoseCount > 0;
 
-              const { count: todayTakenCount } = await supabase
-                .from("dose_logs")
-                .select("id", { count: "exact", head: true })
-                .eq("user_id", p.id)
-                .eq("status", "taken")
-                .gte("scheduled_at", todayStart.toISOString())
-                .lte("scheduled_at", todayEnd.toISOString());
-
-              const dailyDoses = medTimes.length;
-              hasTodayDoses = dailyDoses > 0;
-              tookToday = (todayTakenCount ?? 0) > 0;
+              const todayTaken = pLogs.filter(
+                (d) => d.status === "taken" && new Date(d.scheduled_at) >= todayStart && new Date(d.scheduled_at) <= todayEnd
+              ).length;
+              tookToday = todayTaken > 0;
 
               if (totalDoses > 0) {
-                const wStart = new Date(today);
-                wStart.setDate(wStart.getDate() - 6);
-                wStart.setHours(0, 0, 0, 0);
-
-                const { count: takenCount } = await supabase
-                  .from("dose_logs")
-                  .select("id", { count: "exact", head: true })
-                  .eq("user_id", p.id)
-                  .eq("status", "taken")
-                  .gte("scheduled_at", wStart.toISOString())
-                  .lte("scheduled_at", todayEnd.toISOString());
-
-                adherence = Math.round(((takenCount ?? 0) / totalDoses) * 100);
+                const weekTaken = pLogs.filter((d) => d.status === "taken").length;
+                adherence = Math.round((weekTaken / totalDoses) * 100);
               }
             }
 
@@ -200,7 +207,7 @@ export default function DoctorDashboardPage() {
               email: p.email || "",
               phone: p.phone,
               adherence,
-              medsCount: medsCount ?? 0,
+              medsCount: pMeds.length,
               lastSeen: null,
               color: getAvatarColor(name),
               status: pStatus,
@@ -263,10 +270,10 @@ export default function DoctorDashboardPage() {
   }
 
   return (
-    <div>
+    <div className="w-full">
       {/* Topbar */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-7">
-        <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-6 pt-2 md:pt-3 mb-8 w-full">
+        <div className="min-w-0">
           <h1 className="text-[32px] font-extrabold tracking-[-0.02em] leading-none m-0 mb-1">
             Merhaba Dr. {doctor?.full_name?.split(" ")[0] || "Doktor"} 👋
           </h1>
@@ -274,7 +281,7 @@ export default function DoctorDashboardPage() {
             {doctor?.specialty} · {doctor?.hospital || "Bağımsız"} · Bugün {trDate(today)}
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-3 sm:ml-auto">
           <button
             onClick={() => router.push("/doctor-dashboard/invites")}
             className="relative w-11 h-11 rounded-xl bg-card border border-border flex items-center justify-center text-[oklch(0.42_0.022_245)] hover:border-[oklch(0.85_0.018_220)] hover:text-[oklch(0.22_0.025_245)] transition-all"
@@ -286,7 +293,7 @@ export default function DoctorDashboardPage() {
           </button>
           <button
             onClick={() => setShowInvite(true)}
-            className="inline-flex items-center gap-2.5 px-[22px] py-[13px] rounded-xl bg-[oklch(0.58_0.13_220)] text-white font-bold shadow-[0_6px_14px_-6px_oklch(0.58_0.13_220)] hover:bg-[oklch(0.50_0.14_225)] transition-all"
+            className="inline-flex items-center gap-2.5 px-[22px] py-[13px] rounded-xl bg-gradient-to-br from-[oklch(0.55_0.13_165)] to-[oklch(0.50_0.14_200)] text-white font-bold shadow-md hover:opacity-90 transition-all"
           >
             <Plus className="w-[18px] h-[18px]" /> Hasta Davet Et
           </button>

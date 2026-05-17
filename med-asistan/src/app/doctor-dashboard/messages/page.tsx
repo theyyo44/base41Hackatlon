@@ -134,8 +134,9 @@ export default function DoctorMessagesPage() {
       attachmentType = selectedFile.type || "application/octet-stream";
     }
 
+    const tempId = `temp-${Date.now()}`;
     const optimistic: ChatMessage = {
-      id: crypto.randomUUID(),
+      id: tempId,
       doctor_id: doctorId,
       patient_id: selectedPatientId,
       sender_id: doctorId,
@@ -193,7 +194,13 @@ export default function DoctorMessagesPage() {
         (payload) => {
           const row = payload.new as ChatMessage;
           if (row.doctor_id === doctorId && row.patient_id === selectedPatientId) {
-            setMessages((prev) => [...prev, row]);
+            setMessages((prev) => {
+              if (prev.some((m) => m.id === row.id)) return prev;
+              const cleaned = row.sender_id === doctorId
+                ? prev.filter((m) => !m.id.startsWith("temp-") || m.message !== row.message)
+                : prev;
+              return [...cleaned, row];
+            });
             if (row.sender_id !== doctorId) {
               markAsRead(doctorId, selectedPatientId);
             }
@@ -256,7 +263,7 @@ export default function DoctorMessagesPage() {
                     )
                   )}
                   <div className={`text-[11px] mt-1 ${mine ? "text-white/80" : "text-muted-foreground"}`}>
-                    {new Date(m.created_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" })}
+                    {new Date(m.created_at + (m.created_at.endsWith("Z") || m.created_at.includes("+") ? "" : "Z")).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" })}
                   </div>
                 </div>
               );

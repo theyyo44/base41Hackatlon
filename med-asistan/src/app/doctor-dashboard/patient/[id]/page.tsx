@@ -106,35 +106,57 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     } = await supabase.auth.getUser();
     if (!user) return;
 
-    const { data: rel } = await supabase
-      .from("doctor_patients")
-      .select("id")
-      .eq("doctor_id", user.id)
-      .eq("patient_id", patientId)
-      .eq("status", "active")
-      .single();
+    const today = new Date();
+    const weekStart = new Date(today);
+    weekStart.setDate(weekStart.getDate() - 6);
+    weekStart.setHours(0, 0, 0, 0);
+    const weekEnd = new Date(today);
+    weekEnd.setHours(23, 59, 59, 999);
 
-    if (!rel) {
+    const [relResult, profileResult, medsResult, logsResult, notesResult] = await Promise.all([
+      supabase
+        .from("doctor_patients")
+        .select("id")
+        .eq("doctor_id", user.id)
+        .eq("patient_id", patientId)
+        .eq("status", "active")
+        .single(),
+      supabase
+        .from("profiles")
+        .select("full_name, email, phone, emergency_contact")
+        .eq("id", patientId)
+        .single(),
+      supabase
+        .from("medicines")
+        .select("id, name, active_ingredient, dosage, quantity, is_active, schedules(id, times)")
+        .eq("user_id", patientId)
+        .eq("is_active", true),
+      supabase
+        .from("dose_logs")
+        .select("medicine_id, scheduled_at")
+        .eq("user_id", patientId)
+        .eq("status", "taken")
+        .gte("scheduled_at", weekStart.toISOString())
+        .lte("scheduled_at", weekEnd.toISOString()),
+      supabase
+        .from("doctor_notes")
+        .select("id, content, created_at")
+        .eq("doctor_id", user.id)
+        .eq("patient_id", patientId)
+        .order("created_at", { ascending: false }),
+    ]);
+
+    if (!relResult.data) {
       toast.error("Bu hastaya erişim izniniz yok.");
       router.push("/doctor-dashboard");
       return;
     }
 
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("full_name, email, phone, emergency_contact")
-      .eq("id", patientId)
-      .single();
-    if (profile) setPatient(profile);
+    if (profileResult.data) setPatient(profileResult.data);
+    if (notesResult.data) setNotes(notesResult.data);
 
-    const { data: meds } = await supabase
-      .from("medicines")
-      .select("id, name, active_ingredient, dosage, quantity, is_active, schedules(id, times)")
-      .eq("user_id", patientId)
-      .eq("is_active", true);
-
-    const medsList = meds
-      ? meds.map((m: any) => ({
+    const medsList = medsResult.data
+      ? medsResult.data.map((m: any) => ({
           id: m.id,
           name: m.name,
           active_ingredient: m.active_ingredient,
@@ -147,7 +169,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         }))
       : [];
 
-    const today = new Date();
     const dayLabels = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
     const week: WeekDay[] = [];
     for (let i = 6; i >= 0; i--) {
@@ -162,19 +183,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       });
     }
 
-    const weekStart = new Date(today);
-    weekStart.setDate(weekStart.getDate() - 6);
-    weekStart.setHours(0, 0, 0, 0);
-    const weekEnd = new Date(today);
-    weekEnd.setHours(23, 59, 59, 999);
-
-    const { data: logs } = await supabase
-      .from("dose_logs")
-      .select("medicine_id, scheduled_at")
-      .eq("user_id", patientId)
-      .eq("status", "taken")
-      .gte("scheduled_at", weekStart.toISOString())
-      .lte("scheduled_at", weekEnd.toISOString());
+    const logs = logsResult.data;
 
     const logSet = new Set(
       (logs || []).map((l) => {
@@ -229,14 +238,6 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     setWeekData(week);
     setTodayDoses(todayList);
     setOverallAdherence(totalAll > 0 ? Math.round((takenAll / totalAll) * 100) : 0);
-
-    const { data: doctorNotes } = await supabase
-      .from("doctor_notes")
-      .select("id, content, created_at")
-      .eq("doctor_id", user.id)
-      .eq("patient_id", patientId)
-      .order("created_at", { ascending: false });
-    if (doctorNotes) setNotes(doctorNotes);
 
     setLoading(false);
   }

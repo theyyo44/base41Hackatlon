@@ -28,6 +28,7 @@ type Medicine = {
   name: string;
   active_ingredient: string | null;
   dosage: string | null;
+  scheduleNotes: string | null;
   quantity: number;
   is_active: boolean;
   times: string[];
@@ -92,7 +93,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   const [noteSaving, setNoteSaving] = useState(false);
 
   const [editMed, setEditMed] = useState<Medicine | null>(null);
-  const [editForm, setEditForm] = useState({ name: "", activeIngredient: "", dosage: "", quantity: 1, times: [] as string[] });
+  const [editForm, setEditForm] = useState({ name: "", activeIngredient: "", dosage: "", quantity: 1, notes: "", times: [] as string[] });
   const [editSaving, setEditSaving] = useState(false);
 
   useEffect(() => {
@@ -128,7 +129,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         .single(),
       supabase
         .from("medicines")
-        .select("id, name, active_ingredient, dosage, quantity, is_active, schedules(id, times)")
+        .select("id, name, active_ingredient, dosage, quantity, is_active, schedules(id, times, notes)")
         .eq("user_id", patientId)
         .eq("is_active", true),
       supabase
@@ -147,7 +148,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
     ]);
 
     if (!relResult.data) {
-      toast.error("Bu hastaya erişim izniniz yok.");
+      toast.error("Bu hastaya eriÅŸim izniniz yok.");
       router.push("/doctor-dashboard");
       return;
     }
@@ -161,6 +162,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           name: m.name,
           active_ingredient: m.active_ingredient,
           dosage: m.dosage,
+          scheduleNotes: m.schedules?.[0]?.notes || null,
           quantity: m.quantity ?? 0,
           is_active: m.is_active,
           times: (m.schedules?.[0]?.times || []) as string[],
@@ -169,7 +171,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         }))
       : [];
 
-    const dayLabels = ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"];
+    const dayLabels = ["Paz", "Pzt", "Sal", "Ã‡ar", "Per", "Cum", "Cmt"];
     const week: WeekDay[] = [];
     for (let i = 6; i >= 0; i--) {
       const d = new Date(today);
@@ -244,7 +246,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   async function prescribeMedicine() {
     if (!prescForm.name.trim()) {
-      toast.error("İlaç adı gerekli");
+      toast.error("Ä°laÃ§ adÄ± gerekli");
       return;
     }
     setPrescSaving(true);
@@ -269,7 +271,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       .single();
 
     if (medError || !med) {
-      toast.error("İlaç eklenemedi: " + (medError?.message || "Bilinmeyen hata"));
+      toast.error("Ä°laÃ§ eklenemedi: " + (medError?.message || "Bilinmeyen hata"));
       setPrescSaving(false);
       return;
     }
@@ -303,7 +305,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       await supabase.from("dose_logs").insert(doseRows);
     }
 
-    toast.success(`${prescForm.name} reçete edildi`);
+    toast.success(`${prescForm.name} reÃ§ete edildi`);
     setShowPrescribe(false);
     setPrescForm({
       name: "",
@@ -326,13 +328,14 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       activeIngredient: m.active_ingredient || "",
       dosage: m.dosage || "",
       quantity: m.quantity,
+      notes: m.scheduleNotes || "",
       times: m.times.map((t) => t.slice(0, 5)),
     });
   }
 
   async function saveEditMed() {
     if (!editMed || !editForm.name.trim()) {
-      toast.error("İlaç adı gerekli");
+      toast.error("Ä°laÃ§ adÄ± gerekli");
       return;
     }
     setEditSaving(true);
@@ -349,13 +352,16 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       .eq("id", editMed.id);
 
     if (!error && editMed.scheduleId) {
-      await supabase.from("schedules").update({ times: editForm.times }).eq("id", editMed.scheduleId);
+      await supabase
+        .from("schedules")
+        .update({ times: editForm.times, notes: editForm.notes.trim() || null })
+        .eq("id", editMed.scheduleId);
     }
 
     if (error) {
-      toast.error("Güncelleme başarısız: " + error.message);
+      toast.error("GÃ¼ncelleme baÅŸarÄ±sÄ±z: " + error.message);
     } else {
-      toast.success(`${editForm.name} güncellendi`);
+      toast.success(`${editForm.name} gÃ¼ncellendi`);
       setEditMed(null);
       loadPatient();
     }
@@ -389,8 +395,8 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
   const timeSlots = [
     { key: "sabah", label: "Sabah", time: "09:00", icon: Sun },
-    { key: "ogle", label: "Öğle", time: "14:00", icon: Sunset },
-    { key: "aksam", label: "Akşam", time: "20:00", icon: Moon },
+    { key: "ogle", label: "Ã–ÄŸle", time: "14:00", icon: Sunset },
+    { key: "aksam", label: "AkÅŸam", time: "20:00", icon: Moon },
   ] as const;
 
   function togglePrescTime(time: string) {
@@ -411,7 +417,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
   }
 
   if (!patient) {
-    return <div className="text-center py-20 text-[oklch(0.58_0.018_245)]">Hasta bulunamadı.</div>;
+    return <div className="text-center py-20 text-[oklch(0.58_0.018_245)]">Hasta bulunamadÄ±.</div>;
   }
 
   const avatarColor = getAvatarColor(patient.full_name);
@@ -426,7 +432,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           onClick={() => router.push("/doctor-dashboard")}
           className="inline-flex items-center gap-1.5 px-3.5 py-[9px] rounded-[9px] bg-card border border-border font-semibold text-sm hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all"
         >
-          <ChevronLeft className="w-3.5 h-3.5" /> Hastalarım
+          <ChevronLeft className="w-3.5 h-3.5" /> HastalarÄ±m
         </button>
         <span className="text-[oklch(0.72_0.015_245)]">/</span>
         <span className="font-semibold text-[oklch(0.58_0.018_245)]">{patient.full_name}</span>
@@ -446,10 +452,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           </h1>
           <div className="flex flex-wrap gap-4 text-[15px] text-[oklch(0.58_0.018_245)]">
             {patient.phone && (
-              <span className="flex items-center gap-1.5">📞 {patient.phone}</span>
+              <span className="flex items-center gap-1.5">ğŸ“ {patient.phone}</span>
             )}
             {patient.emergency_contact && (
-              <span className="flex items-center gap-1.5">🆘 {patient.emergency_contact}</span>
+              <span className="flex items-center gap-1.5">ğŸ†˜ {patient.emergency_contact}</span>
             )}
           </div>
         </div>
@@ -467,14 +473,14 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           >
             %{overallAdherence}
           </div>
-          <div className="text-[13px] text-[oklch(0.58_0.018_245)] mt-1 font-semibold">7 günlük uyum</div>
+          <div className="text-[13px] text-[oklch(0.58_0.018_245)] mt-1 font-semibold">7 gÃ¼nlÃ¼k uyum</div>
         </div>
       </div>
 
       {/* Today's doses */}
       {todayDoses.length > 0 && (
         <div className="bg-card border border-border rounded-2xl p-6 mb-[22px]">
-          <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">Bugünkü Dozlar</h3>
+          <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">BugÃ¼nkÃ¼ Dozlar</h3>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
             {todayDoses.map((d, i) => (
               <div
@@ -512,17 +518,17 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           {/* Active meds card */}
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold tracking-[-0.01em] m-0">Aktif İlaçlar</h3>
+              <h3 className="text-lg font-bold tracking-[-0.01em] m-0">Aktif Ä°laÃ§lar</h3>
             </div>
             {medicines.length === 0 ? (
               <div className="text-center py-8 text-[oklch(0.58_0.018_245)]">
-                Hastanın aktif ilacı bulunmuyor.
+                HastanÄ±n aktif ilacÄ± bulunmuyor.
               </div>
             ) : (
               <table className="w-full border-collapse">
                 <thead>
                   <tr>
-                    <th className="text-left text-xs font-bold uppercase tracking-[0.06em] text-[oklch(0.58_0.018_245)] pb-3 pl-0">İlaç</th>
+                    <th className="text-left text-xs font-bold uppercase tracking-[0.06em] text-[oklch(0.58_0.018_245)] pb-3 pl-0">Ä°laÃ§</th>
                     <th className="text-left text-xs font-bold uppercase tracking-[0.06em] text-[oklch(0.58_0.018_245)] pb-3">Doz</th>
                     <th className="text-left text-xs font-bold uppercase tracking-[0.06em] text-[oklch(0.58_0.018_245)] pb-3">Saatler</th>
                     <th className="text-right text-xs font-bold uppercase tracking-[0.06em] text-[oklch(0.58_0.018_245)] pb-3">Uyum</th>
@@ -545,7 +551,14 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                             </div>
                           </div>
                         </td>
-                        <td className="py-4 text-[15px]">{m.dosage}</td>
+                        <td className="py-4 text-[15px]">
+                          <div>{m.dosage}</div>
+                          {m.scheduleNotes && (
+                            <div className="text-[12px] text-[oklch(0.58_0.018_245)] mt-1 line-clamp-2">
+                              Not: {m.scheduleNotes}
+                            </div>
+                          )}
+                        </td>
                         <td className="py-4">
                           <div className="flex gap-1 flex-wrap">
                             {m.times.map((t) => (
@@ -564,7 +577,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                           %{m.adherence}
                         </td>
                         <td className="py-4 pr-0 text-right">
-                          <button onClick={() => openEditMed(m)} title="Düzenle" className="w-8 h-8 rounded-lg flex items-center justify-center text-[oklch(0.58_0.018_245)] hover:bg-[oklch(0.96_0.025_220)] hover:text-[oklch(0.32_0.10_225)] transition-colors">
+                          <button onClick={() => openEditMed(m)} title="DÃ¼zenle" className="w-8 h-8 rounded-lg flex items-center justify-center text-[oklch(0.58_0.018_245)] hover:bg-[oklch(0.96_0.025_220)] hover:text-[oklch(0.32_0.10_225)] transition-colors">
                             <Pencil className="w-4 h-4" />
                           </button>
                         </td>
@@ -579,7 +592,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
           {/* Week adherence chart */}
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold tracking-[-0.01em] m-0">Son 7 Gün Uyum Tablosu</h3>
+              <h3 className="text-lg font-bold tracking-[-0.01em] m-0">Son 7 GÃ¼n Uyum Tablosu</h3>
             </div>
             <div className="grid grid-cols-7 gap-2.5">
               {weekData.map((day, i) => {
@@ -628,7 +641,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                     {hoveredDay === i && day.details.length > 0 && (
                       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 w-[220px] bg-[oklch(0.18_0.02_260)] text-white rounded-xl p-3 shadow-xl pointer-events-none" style={{ animation: "popIn .15s ease" }}>
                         <div className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0 border-l-[6px] border-r-[6px] border-b-[6px] border-l-transparent border-r-transparent border-b-[oklch(0.18_0.02_260)]" />
-                        <div className="text-xs font-bold mb-2 text-[oklch(0.75_0.02_220)]">{day.label} — {day.date}</div>
+                        <div className="text-xs font-bold mb-2 text-[oklch(0.75_0.02_220)]">{day.label} â€” {day.date}</div>
                         <div className="flex flex-col gap-1.5">
                           {[...day.details].sort((a, b) => a.time.localeCompare(b.time)).map((d, di) => (
                             <div key={di} className="flex items-center gap-2 text-xs">
@@ -652,10 +665,10 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               <Sparkles className="w-[18px] h-[18px] shrink-0" />
               <div className="text-sm text-[oklch(0.42_0.022_245)]">
                 {adhStatus === "ok"
-                  ? "Hastanız ilaçlarını düzenli olarak alıyor. Mevcut tedavi planına devam edebilirsiniz."
+                  ? "HastanÄ±z ilaÃ§larÄ±nÄ± dÃ¼zenli olarak alÄ±yor. Mevcut tedavi planÄ±na devam edebilirsiniz."
                   : adhStatus === "warn"
-                  ? "Hastanız bazı dozları kaçırıyor. Bir sonraki kontrolde nedenini sorabilirsiniz."
-                  : "Uyum oranı kritik seviyede. Hastanızı en kısa sürede aramanız önerilir."}
+                  ? "HastanÄ±z bazÄ± dozlarÄ± kaÃ§Ä±rÄ±yor. Bir sonraki kontrolde nedenini sorabilirsiniz."
+                  : "Uyum oranÄ± kritik seviyede. HastanÄ±zÄ± en kÄ±sa sÃ¼rede aramanÄ±z Ã¶nerilir."}
               </div>
             </div>
           </div>
@@ -665,19 +678,19 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         <div className="flex flex-col gap-[18px]">
           {/* Quick actions */}
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">Hızlı Eylemler</h3>
+            <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">HÄ±zlÄ± Eylemler</h3>
             <div className="flex flex-col gap-2">
               <button className="flex items-center gap-2.5 px-[22px] py-[13px] rounded-xl bg-card border border-border font-bold hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all justify-start min-h-[48px]">
-                <Bell className="w-4 h-4" /> Hatırlatma gönder
+                <Bell className="w-4 h-4" /> HatÄ±rlatma gÃ¶nder
               </button>
               <button
                 onClick={() => setShowPrescribe(true)}
                 className="flex items-center gap-2.5 px-[22px] py-[13px] rounded-xl bg-card border border-border font-bold hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all justify-start min-h-[48px]"
               >
-                <Plus className="w-4 h-4" /> Reçeteye ilaç ekle
+                <Plus className="w-4 h-4" /> ReÃ§eteye ilaÃ§ ekle
               </button>
               <button className="flex items-center gap-2.5 px-[22px] py-[13px] rounded-xl bg-card border border-border font-bold hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all justify-start min-h-[48px]">
-                <FileText className="w-4 h-4" /> Notlarım
+                <FileText className="w-4 h-4" /> NotlarÄ±m
               </button>
             </div>
           </div>
@@ -687,7 +700,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">Son Aktivite</h3>
             <div className="flex flex-col gap-3 text-sm">
               {notes.length === 0 && medicines.length === 0 ? (
-                <div className="text-center py-4 text-[oklch(0.58_0.018_245)]">Henüz aktivite yok.</div>
+                <div className="text-center py-4 text-[oklch(0.58_0.018_245)]">HenÃ¼z aktivite yok.</div>
               ) : (
                 <>
                   {medicines.slice(0, 2).map((m) => (
@@ -697,7 +710,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                       </div>
                       <div>
                         <div className="font-semibold">{m.name} eklendi</div>
-                        <div className="text-[13px] text-[oklch(0.58_0.018_245)]">Reçete ile</div>
+                        <div className="text-[13px] text-[oklch(0.58_0.018_245)]">ReÃ§ete ile</div>
                       </div>
                     </div>
                   ))}
@@ -707,7 +720,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                         <FileText className="w-3.5 h-3.5" />
                       </div>
                       <div>
-                        <div className="font-semibold truncate max-w-[200px]">{n.content.slice(0, 40)}{n.content.length > 40 ? "…" : ""}</div>
+                        <div className="font-semibold truncate max-w-[200px]">{n.content.slice(0, 40)}{n.content.length > 40 ? "â€¦" : ""}</div>
                         <div className="text-[13px] text-[oklch(0.58_0.018_245)]">
                           {new Date(n.created_at).toLocaleDateString("tr-TR")}
                         </div>
@@ -721,12 +734,12 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
           {/* Doctor notes */}
           <div className="bg-card border border-border rounded-2xl p-6">
-            <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">Doktor Notları</h3>
+            <h3 className="text-lg font-bold tracking-[-0.01em] m-0 mb-4">Doktor NotlarÄ±</h3>
             <textarea
               rows={3}
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
-              placeholder="Bu hasta hakkında not ekleyin..."
+              placeholder="Bu hasta hakkÄ±nda not ekleyin..."
               className="w-full px-4 py-[13px] border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-[oklch(0.58_0.13_220)] focus:shadow-[0_0_0_4px_oklch(0.88_0.08_220/0.4)] transition-all resize-none mb-3"
             />
             <div className="flex justify-end mb-4">
@@ -766,15 +779,15 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
         <div className="fixed inset-0 z-50 grid place-items-center p-5" style={{ background: "oklch(0.2 0.03 245 / 0.45)", animation: "fadeIn .15s ease" }} onClick={() => setEditMed(null)}>
           <div className="bg-card border border-border rounded-[20px] p-7 w-full max-w-[520px] shadow-[0_18px_50px_-20px_oklch(0.4_0.05_245/0.30)] max-h-[90vh] overflow-y-auto" style={{ animation: "popIn .2s ease" }} onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-2">
-              <h3 className="font-bold text-[22px] tracking-[-0.01em] m-0">İlaç Düzenle</h3>
+              <h3 className="font-bold text-[22px] tracking-[-0.01em] m-0">Ä°laÃ§ DÃ¼zenle</h3>
               <button onClick={() => setEditMed(null)} className="w-8 h-8 rounded-lg flex items-center justify-center text-[oklch(0.58_0.018_245)] hover:bg-[oklch(0.975_0.008_220)] transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-[oklch(0.42_0.022_245)] text-sm m-0 mb-[22px]">{editMed.name} bilgilerini düzenleyin.</p>
+            <p className="text-[oklch(0.42_0.022_245)] text-sm m-0 mb-[22px]">{editMed.name} bilgilerini dÃ¼zenleyin.</p>
 
             <div className="flex flex-col gap-2 mb-[18px]">
-              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">İlaç Adı *</label>
+              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Ä°laÃ§ AdÄ± *</label>
               <input type="text" value={editForm.name} onChange={(e) => setEditForm((f) => ({ ...f, name: e.target.value }))}
                 className="px-4 py-[13px] border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-[oklch(0.58_0.13_220)] focus:shadow-[0_0_0_4px_oklch(0.88_0.08_220/0.4)] transition-all" />
             </div>
@@ -798,7 +811,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
             </div>
 
             <div className="flex flex-col gap-2 mb-6">
-              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Kullanım Saatleri</label>
+              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">KullanÄ±m Saatleri</label>
               <div className="grid grid-cols-3 gap-3">
                 {timeSlots.map((slot) => {
                   const active = editForm.times.includes(slot.time);
@@ -817,10 +830,21 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
               </div>
             </div>
 
+
+            <div className="flex flex-col gap-2 mb-6">
+              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Ilac Notu</label>
+              <textarea
+                rows={2}
+                value={editForm.notes}
+                onChange={(e) => setEditForm((f) => ({ ...f, notes: e.target.value }))}
+                placeholder="Orn. Yemekten sonra, ac karnina almayin"
+                className="px-4 py-[13px] border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-[oklch(0.58_0.13_220)] focus:shadow-[0_0_0_4px_oklch(0.88_0.08_220/0.4)] transition-all resize-none"
+              />
+            </div>
             <div className="flex gap-2.5 justify-end">
               <button onClick={() => setEditMed(null)}
                 className="px-[22px] py-[13px] rounded-xl bg-card border border-border font-bold hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all min-h-[48px]">
-                İptal
+                Ä°ptal
               </button>
               <button onClick={saveEditMed} disabled={editSaving}
                 className="inline-flex items-center gap-2 px-[22px] py-[13px] rounded-xl bg-[oklch(0.58_0.13_220)] text-white font-bold shadow-[0_6px_14px_-6px_oklch(0.58_0.13_220)] hover:bg-[oklch(0.50_0.14_225)] transition-all disabled:opacity-60 min-h-[48px]">
@@ -835,16 +859,16 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
       {showPrescribe && (
         <div className="fixed inset-0 z-50 grid place-items-center p-5" style={{ background: "oklch(0.2 0.03 245 / 0.45)", animation: "fadeIn .15s ease" }} onClick={() => setShowPrescribe(false)}>
           <div className="bg-card border border-border rounded-[20px] p-7 w-full max-w-[520px] shadow-[0_18px_50px_-20px_oklch(0.4_0.05_245/0.30)] max-h-[90vh] overflow-y-auto" style={{ animation: "popIn .2s ease" }} onClick={(e) => e.stopPropagation()}>
-            <h3 className="font-bold text-[22px] tracking-[-0.01em] m-0 mb-2">Yeni İlaç Reçete Et</h3>
-            <p className="text-[oklch(0.42_0.022_245)] text-sm m-0 mb-[22px]">Hastaya yeni ilaç ekleyin.</p>
+            <h3 className="font-bold text-[22px] tracking-[-0.01em] m-0 mb-2">Yeni Ä°laÃ§ ReÃ§ete Et</h3>
+            <p className="text-[oklch(0.42_0.022_245)] text-sm m-0 mb-[22px]">Hastaya yeni ilaÃ§ ekleyin.</p>
 
             <div className="flex flex-col gap-2 mb-[18px]">
-              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">İlaç Adı *</label>
+              <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Ä°laÃ§ AdÄ± *</label>
               <input
                 type="text"
                 value={prescForm.name}
                 onChange={(e) => setPrescForm((f) => ({ ...f, name: e.target.value }))}
-                placeholder="Örn. Parol 500mg"
+                placeholder="Ã–rn. Parol 500mg"
                 className="px-4 py-[13px] border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-[oklch(0.58_0.13_220)] focus:shadow-[0_0_0_4px_oklch(0.88_0.08_220/0.4)] transition-all"
               />
             </div>
@@ -910,7 +934,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
 
             <div className="grid grid-cols-2 gap-3.5 mb-6">
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Başlangıç</label>
+                <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">BaÅŸlangÄ±Ã§</label>
                 <input
                   type="date"
                   value={prescForm.startDate}
@@ -919,7 +943,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 />
               </div>
               <div className="flex flex-col gap-2">
-                <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">Bitiş (opsiyonel)</label>
+                <label className="text-sm font-bold text-[oklch(0.42_0.022_245)]">BitiÅŸ (opsiyonel)</label>
                 <input
                   type="date"
                   value={prescForm.endDate}
@@ -935,7 +959,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 rows={2}
                 value={prescForm.notes}
                 onChange={(e) => setPrescForm((f) => ({ ...f, notes: e.target.value }))}
-                placeholder="Örn. Yemeklerden sonra alınmalı, aç karnına içilmemeli..."
+                placeholder="Ã–rn. Yemeklerden sonra alÄ±nmalÄ±, aÃ§ karnÄ±na iÃ§ilmemeli..."
                 className="px-4 py-[13px] border-[1.5px] border-border rounded-xl bg-card text-base outline-none focus:border-[oklch(0.58_0.13_220)] focus:shadow-[0_0_0_4px_oklch(0.88_0.08_220/0.4)] transition-all resize-none"
               />
             </div>
@@ -945,7 +969,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                 onClick={() => setShowPrescribe(false)}
                 className="px-[22px] py-[13px] rounded-xl bg-card border border-border font-bold hover:border-[oklch(0.85_0.018_220)] hover:bg-[oklch(0.975_0.008_220)] transition-all min-h-[48px]"
               >
-                İptal
+                Ä°ptal
               </button>
               <button
                 onClick={prescribeMedicine}
@@ -956,7 +980,7 @@ export default function PatientDetailPage({ params }: { params: Promise<{ id: st
                   <div className="w-4 h-4 border-[2.5px] border-white/35 border-t-white rounded-full animate-spin" />
                 ) : (
                   <>
-                    <Check className="w-4 h-4" /> Reçete Et
+                    <Check className="w-4 h-4" /> ReÃ§ete Et
                   </>
                 )}
               </button>

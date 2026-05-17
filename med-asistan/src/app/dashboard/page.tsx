@@ -68,7 +68,7 @@ export default function DashboardPage() {
         .eq("id", user.id)
         .single();
 
-      setUserName(profile?.full_name || user.user_metadata?.full_name || "KullanÄ±cÄ±");
+      setUserName(profile?.full_name || user.user_metadata?.full_name || "KullanÃ„Â±cÃ„Â±");
 
       const { data: meds } = await supabase
         .from("medicines")
@@ -206,10 +206,10 @@ export default function DashboardPage() {
         .eq("medicine_id", dose.medicineId)
         .eq("scheduled_at", scheduledAt.toISOString());
       if (error) {
-        toast.error("İşaret kaldırma başarısız: " + error.message);
+        toast.error("Ã„Â°Ã…Å¸aret kaldÃ„Â±rma baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
       } else {
         await adjustMedicineQuantity(dose.medicineId, +1);
-        toast.success("İşaret kaldırıldı");
+        toast.success("Ã„Â°Ã…Å¸aret kaldÃ„Â±rÃ„Â±ldÃ„Â±");
       }
     } else {
       const { data: existing } = await supabase
@@ -240,12 +240,12 @@ export default function DashboardPage() {
         }));
       }
       if (error) {
-        toast.error("Kayıt başarısız: " + error.message);
+        toast.error("KayÃ„Â±t baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
       } else {
         if (shouldDecreaseQuantity) {
           await adjustMedicineQuantity(dose.medicineId, -1);
         }
-        toast.success(`${dose.name} alındı olarak işaretlendi`);
+        toast.success(`${dose.name} alÃ„Â±ndÃ„Â± olarak iÃ…Å¸aretlendi`);
       }
     }
   }
@@ -261,7 +261,7 @@ export default function DashboardPage() {
       })
       .eq("id", inviteId);
     if (error) {
-      toast.error("Ä°ÅŸlem baÅŸarÄ±sÄ±z: " + error.message);
+      toast.error("Ã„Â°Ã…Å¸lem baÃ…Å¸arÃ„Â±sÃ„Â±z: " + error.message);
       return;
     }
     toast.success(accept ? "Davet kabul edildi!" : "Davet reddedildi.");
@@ -312,13 +312,13 @@ export default function DashboardPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-7 gap-4 sm:gap-6 w-full">
         <div className="min-w-0">
           <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">
-            Merhaba, {userName.split(" ")[0]} ğŸ‘‹
+            Merhaba, {userName.split(" ")[0]}
           </h1>
           <p className="text-muted-foreground text-base m-0">
-            BugÃ¼n {trDate(today)} â€” {trWeekday(today)}.{" "}
+            Bugun {trDate(today)} - {trWeekday(today)}.{" "}
             {total > 0
-              ? `BugÃ¼n ${total} doz almanÄ±z gerekiyor.`
-              : "HenÃ¼z ilaÃ§ planÄ±nÄ±z yok."}
+              ? `Bugun ${total} doz almaniz gerekiyor.`
+              : "Henuz ilac planiniz yok."}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-3 sm:ml-auto">
@@ -332,7 +332,7 @@ export default function DashboardPage() {
             href="/dashboard/add-medicine"
             className="inline-flex items-center gap-2.5 px-5 py-3 rounded-xl bg-brand text-white font-bold text-base shadow-md shadow-brand/30 hover:bg-brand-2 transition-colors"
           >
-            <Plus className="w-[18px] h-[18px]" /> Ä°laÃ§ Ekle
+            <Plus className="w-[18px] h-[18px]" /> Ilac Ekle
           </Link>
         </div>
       </div>
@@ -342,22 +342,22 @@ export default function DashboardPage() {
           icon={<Pill className="w-[22px] h-[22px]" />}
           tone="blue"
           num={activeMeds.length}
-          label="Aktif ilaÃ§"
-          foot={<><Check className="w-3.5 h-3.5" /> DÃ¼zenli kullanÄ±m</>}
+          label="Aktif ilac"
+          foot={<><Check className="w-3.5 h-3.5" /> Duzenli kullanim</>}
         />
         <StatCard
           icon={<Clock className="w-[22px] h-[22px]" />}
           tone="mint"
           num={`${taken}/${total}`}
-          label="BugÃ¼nkÃ¼ doz"
-          foot={<>Uyum oranÄ±: %{adherence}</>}
+          label="Bugunku doz"
+          foot={<>Uyum orani: %{adherence}</>}
         />
         <StatCard
           icon={<AlertTriangle className="w-[22px] h-[22px]" />}
           tone="amber"
           num={expiringSoon.length}
-          label="SKT uyarÄ±sÄ±"
-          foot={<>90 gÃ¼n iÃ§inde bozulacak</>}
+          label="SKT uyarisi"
+          foot={<>90 gun icinde bozulacak</>}
         />
       </div>
 
@@ -365,17 +365,17 @@ export default function DashboardPage() {
         <div className="bg-card border border-border rounded-2xl p-6">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-lg tracking-tight m-0">BugÃ¼nkÃ¼ dozlar</h3>
-              <div className="text-[13px] text-muted-foreground mt-0.5">AldÄ±ÄŸÄ±nÄ±z dozlarÄ± iÅŸaretleyin</div>
+              <h3 className="font-bold text-lg tracking-tight m-0">Bugunku dozlar</h3>
+              <div className="text-[13px] text-muted-foreground mt-0.5">Aldiginiz dozlari isaretleyin</div>
             </div>
             <Link href="/dashboard/schedule" className="text-muted-foreground text-sm font-semibold hover:text-brand transition-colors">
-              Takvimi gÃ¶r â†’
+              Takvimi gor -&gt;
             </Link>
           </div>
           {doses.length === 0 ? (
             <div className="text-center py-10 text-muted-foreground">
-              HenÃ¼z aktif ilaÃ§ planÄ±nÄ±z yok.{" "}
-              <Link href="/dashboard/add-medicine" className="text-brand font-bold hover:underline">Ä°laÃ§ ekleyin</Link>
+              Henuz aktif ilac planiniz yok.{" "}
+              <Link href="/dashboard/add-medicine" className="text-brand font-bold hover:underline">Ilac ekleyin</Link>
             </div>
           ) : (
             <div className="flex flex-col gap-2.5">
@@ -396,7 +396,7 @@ export default function DashboardPage() {
                     <div>
                       <div className={`font-bold text-base ${d.taken ? "line-through decoration-muted-foreground" : ""}`}>
                         {d.name}{" "}
-                        {d.dosage && <span className="text-muted-foreground font-medium text-sm">Â· {d.dosage}</span>}
+                        {d.dosage && <span className="text-muted-foreground font-medium text-sm">- {d.dosage}</span>}
                       </div>
                       {d.notes && <div className="text-[13px] text-muted-foreground">{d.notes}</div>}
                     </div>
@@ -420,13 +420,13 @@ export default function DashboardPage() {
         <div className="flex flex-col gap-5">
           <div className="bg-card border border-border rounded-2xl p-6">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-lg tracking-tight m-0">SKT uyarÄ±larÄ±</h3>
+              <h3 className="font-bold text-lg tracking-tight m-0">SKT uyarilari</h3>
               <Link href="/dashboard/inventory" className="text-muted-foreground text-sm font-semibold hover:text-brand transition-colors">
-                TÃ¼mÃ¼ â†’
+                Tumu -&gt;
               </Link>
             </div>
             {expiringSoon.length === 0 ? (
-              <div className="text-center py-10 text-muted-foreground">YaklaÅŸan son kullanÄ±m tarihi yok.</div>
+              <div className="text-center py-10 text-muted-foreground">Yaklasan son kullanma tarihi yok.</div>
             ) : (
               <div>
                 {expiringSoon.slice(0, 4).map((m) => {
@@ -470,19 +470,19 @@ export default function DashboardPage() {
                 <Sparkles className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="font-bold text-[17px] m-0 mb-1.5">HaftalÄ±k uyum: %{adherence}</h3>
+                <h3 className="font-bold text-[17px] m-0 mb-1.5">Haftalik uyum: %{adherence}</h3>
                 <p className="text-sm text-muted-foreground leading-relaxed m-0 mb-3">
                   {adherence >= 80
-                    ? "Ä°laÃ§larÄ±nÄ±zÄ± dÃ¼zenli almaya devam edin!"
+                    ? "Ilaclarinizi duzenli almaya devam edin!"
                     : adherence > 0
-                    ? "DozlarÄ±nÄ±zÄ± zamanÄ±nda almayÄ± unutmayÄ±n."
-                    : "Ä°laÃ§ ekleyerek takibe baÅŸlayÄ±n."}
+                    ? "Dozlarinizi zamaninda almayi unutmayin."
+                    : "Ilac ekleyerek takibe baslayin."}
                 </p>
                 <Link
                   href="/dashboard/schedule"
                   className="inline-flex items-center gap-2 px-3.5 py-2 rounded-lg bg-brand-soft text-brand-ink font-bold text-sm hover:bg-[oklch(0.94_0.03_220)] transition-colors"
                 >
-                  DetaylarÄ± gÃ¶r
+                  Detaylari gor
                 </Link>
               </div>
             </div>

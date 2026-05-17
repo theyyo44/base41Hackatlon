@@ -7,7 +7,6 @@ import {
   ArrowRight,
   Camera,
   Bell,
-  Shield,
   Check,
   X,
   Activity,
@@ -28,7 +27,6 @@ function translateError(msg: string): string {
 
 export default function LandingPage() {
   const router = useRouter();
-  const [view, setView] = useState<View>("landing");
   const [animatingOut, setAnimatingOut] = useState(false);
   const [displayView, setDisplayView] = useState<View>("landing");
   const [loading, setLoading] = useState(false);
@@ -54,7 +52,6 @@ export default function LandingPage() {
     if (!animatingOut) return;
     const timer = setTimeout(() => {
       setDisplayView(pendingView.current);
-      setView(pendingView.current);
       setAnimatingOut(false);
     }, 200);
     return () => clearTimeout(timer);
@@ -174,8 +171,8 @@ export default function LandingPage() {
             İlaçlarınızı <em className="not-italic text-brand">kolayca</em> takip edin, hiçbir dozu kaçırmayın.
           </h1>
           <p className="text-lg text-muted-foreground leading-relaxed mb-8 max-w-[540px] animate-slide-up delay-100">
-            Aile büyükleriniz için tasarlandı, herkes için uygundur. İlaç kutusunun
-            fotoğrafını çekin, sistem sizin için doldursun. Doz zamanı geldiğinde
+            İlaç takibi herkes için daha sakin ve düzenli olsun. Kutunun fotoğrafını
+            çekin, bilgileri hızlıca doldurun; doz zamanı geldiğinde nazik bir
             hatırlatma alın.
           </p>
 
@@ -196,11 +193,10 @@ export default function LandingPage() {
           </div>
 
           {/* Features */}
-          <div className="grid grid-cols-3 gap-[18px] mt-12 max-w-[620px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px] mt-12 max-w-[440px]">
             {[
-              { icon: Camera, title: "Fotoğrafla ekle", desc: "Kutunun resmini çek, ilaç bilgisi otomatik dolsun." },
-              { icon: Bell, title: "Akıllı hatırlatma", desc: "Doz zamanı bildirim, telefon görüşmesi veya SMS." },
-              { icon: Shield, title: "Aile bağlantısı", desc: "Yakınlarınız kullanımınızı takip edebilsin." },
+              { icon: Camera, title: "Fotoğrafla ekle", desc: "Kutunun resmini çek, ilaç bilgisi hızlıca dolsun." },
+              { icon: Bell, title: "Akıllı hatırlatma", desc: "Doz zamanı geldiğinde nazikçe hatırlatsın." },
             ].map((f, i) => (
               <div key={f.title} className={`flex flex-col gap-2 animate-slide-up delay-${(i + 3) * 100}`}>
                 <div className="w-[42px] h-[42px] rounded-xl bg-brand-soft text-brand-ink flex items-center justify-center">
@@ -211,13 +207,6 @@ export default function LandingPage() {
               </div>
             ))}
           </div>
-        </div>
-
-        {/* Footer */}
-        <div className="flex gap-[18px] items-center text-[13px] text-muted-foreground mt-8 animate-fade-in delay-600">
-          <span className="flex items-center gap-1.5"><Shield className="w-3.5 h-3.5" /> KVKK uyumlu</span>
-          <span>•</span>
-          <span>Sağlık Bakanlığı protokolüne uygun</span>
         </div>
       </div>
 
@@ -252,24 +241,22 @@ export default function LandingPage() {
               ].map((d, i) => (
                 <div
                   key={i}
-                  className={`grid grid-cols-[78px_1fr_auto] gap-4 items-center px-4 py-3.5 rounded-[14px] border transition-all ${
-                    d.done
+                  className={`grid grid-cols-[78px_1fr_auto] gap-4 items-center px-4 py-3.5 rounded-[14px] border transition-all ${d.done
                       ? "bg-secondary/60 border-border opacity-55"
                       : d.next
-                      ? "bg-brand-soft border-brand-soft"
-                      : "bg-secondary border-border"
-                  }`}
+                        ? "bg-brand-soft border-brand-soft"
+                        : "bg-secondary border-border"
+                    }`}
                 >
                   <div className="font-extrabold text-xl tracking-tight">{d.time}</div>
                   <div>
                     <div className={`font-bold text-base ${d.done ? "line-through decoration-muted-foreground" : ""}`}>{d.name}</div>
                     <div className="text-[13px] text-muted-foreground">{d.meta}</div>
                   </div>
-                  <button className={`w-[42px] h-[42px] rounded-full border-2 flex items-center justify-center transition-colors ${
-                    d.done
+                  <button className={`w-[42px] h-[42px] rounded-full border-2 flex items-center justify-center transition-colors ${d.done
                       ? "bg-mint border-mint text-white"
                       : "border-border bg-card text-muted-foreground"
-                  }`}>
+                    }`}>
                     <Check className="w-[18px] h-[18px]" />
                   </button>
                 </div>
@@ -378,22 +365,20 @@ export default function LandingPage() {
                 <button
                   type="button"
                   onClick={() => setRegRole("patient")}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${
-                    regRole === "patient"
+                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${regRole === "patient"
                       ? "bg-card text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <Heart className={`w-4 h-4 ${regRole === "patient" ? "fill-brand text-brand" : ""}`} /> Hasta
                 </button>
                 <button
                   type="button"
                   onClick={() => setRegRole("doctor")}
-                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${
-                    regRole === "doctor"
+                  className={`flex items-center justify-center gap-2 py-3 rounded-[10px] text-[15px] font-bold transition-all ${regRole === "doctor"
                       ? "bg-card text-foreground shadow-sm"
                       : "text-muted-foreground hover:text-foreground"
-                  }`}
+                    }`}
                 >
                   <Activity className={`w-4 h-4 ${regRole === "doctor" ? "text-brand" : ""}`} /> Doktor
                 </button>

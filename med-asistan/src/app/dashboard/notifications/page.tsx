@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Bell, Loader2 } from "lucide-react";
+import { Bell, Loader2, Stethoscope, Check, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { toast } from "sonner";
 
@@ -12,6 +12,13 @@ type Notification = {
   message: string | null;
   is_read: boolean;
   created_at: string;
+};
+
+type DoctorInvite = {
+  id: string;
+  doctorName: string;
+  note: string | null;
+  invited_at: string;
 };
 
 function timeAgo(dateStr: string): string {
@@ -36,6 +43,7 @@ function typeColor(type: string): string {
 
 export default function NotificationsPage() {
   const [notifs, setNotifs] = useState<Notification[]>([]);
+  const [invites, setInvites] = useState<DoctorInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const unread = notifs.filter((n) => !n.is_read).length;
 
@@ -52,10 +60,55 @@ export default function NotificationsPage() {
         .order("created_at", { ascending: false });
 
       if (data) setNotifs(data);
+
+      // Fetch pending doctor invites
+      const { data: pendingInvites } = await supabase
+        .from("doctor_patients")
+        .select("id, doctor_id, notes, invited_at")
+        .eq("patient_id", user.id)
+        .eq("status", "pending");
+
+      if (pendingInvites && pendingInvites.length > 0) {
+        const doctorIds = pendingInvites.map((i) => i.doctor_id);
+        const { data: doctors } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", doctorIds);
+        const doctorMap = new Map(
+          (doctors || []).map((d) => [d.id, d.full_name || "Doktor"])
+        );
+        setInvites(
+          pendingInvites.map((i) => ({
+            id: i.id,
+            doctorName: `Dr. ${doctorMap.get(i.doctor_id) || "Doktor"}`,
+            note: i.notes,
+            invited_at: i.invited_at,
+          }))
+        );
+      }
+
       setLoading(false);
     }
     load();
   }, []);
+
+  async function respondInvite(inviteId: string, accept: boolean) {
+    const supabase = createClient();
+    const { error } = await supabase
+      .from("doctor_patients")
+      .update({
+        status: accept ? "active" : "ended",
+        accepted_at: accept ? new Date().toISOString() : null,
+        ended_at: accept ? null : new Date().toISOString(),
+      })
+      .eq("id", inviteId);
+    if (error) {
+      toast.error("İşlem başarısız: " + error.message);
+      return;
+    }
+    toast.success(accept ? "Davet kabul edildi!" : "Davet reddedildi.");
+    setInvites((prev) => prev.filter((i) => i.id !== inviteId));
+  }
 
   async function markAllRead() {
     const supabase = createClient();
@@ -87,13 +140,15 @@ export default function NotificationsPage() {
     );
   }
 
+  const totalUnread = unread + invites.length;
+
   return (
     <div>
       <div className="flex items-center justify-between mb-7 gap-6">
         <div>
           <h1 className="text-[32px] font-extrabold tracking-tight m-0 mb-1">Bildirimler</h1>
           <p className="text-muted-foreground text-base m-0">
-            {unread ? `${unread} okunmamış bildirim var` : "Tüm bildirimler okundu"}
+            {totalUnread ? `${totalUnread} okunmamış bildirim var` : "Tüm bildirimler okundu"}
           </p>
         </div>
         {unread > 0 && (
@@ -103,7 +158,44 @@ export default function NotificationsPage() {
         )}
       </div>
 
-      {notifs.length === 0 ? (
+      {/* Doctor invites */}
+      {invites.length > 0 && (
+        <div className="flex flex-col gap-3 mb-6">
+          {invites.map((inv) => (
+            <div
+              key={inv.id}
+              className="flex flex-wrap items-center gap-4 px-[18px] py-4 rounded-[14px] border bg-gradient-to-r from-[oklch(0.95_0.04_165)] to-[oklch(0.96_0.03_200)] border-[oklch(0.88_0.06_165)]"
+            >
+              <div className="w-11 h-11 rounded-xl bg-[oklch(0.55_0.13_165)] text-white flex items-center justify-center shrink-0">
+                <Stethoscope className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-[200px]">
+                <h4 className="font-bold text-base m-0">{inv.doctorName} sizi izlemek istiyor</h4>
+                {inv.note && (
+                  <p className="text-muted-foreground text-sm leading-snug m-0 mt-0.5">{inv.note}</p>
+                )}
+                <div className="text-xs text-muted-foreground font-semibold mt-1">{timeAgo(inv.invited_at)}</div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => respondInvite(inv.id, true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[oklch(0.55_0.13_165)] text-white font-bold text-sm hover:opacity-90 transition-all"
+                >
+                  <Check className="w-4 h-4" /> Kabul Et
+                </button>
+                <button
+                  onClick={() => respondInvite(inv.id, false)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-card border border-border font-bold text-sm hover:bg-secondary transition-colors"
+                >
+                  <X className="w-4 h-4" /> Reddet
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {notifs.length === 0 && invites.length === 0 ? (
         <div className="text-center py-16 text-muted-foreground">
           <Bell className="w-12 h-12 mx-auto mb-3 opacity-30" />
           <p className="font-semibold">Henüz bildirim yok</p>

@@ -38,7 +38,7 @@ export default function DoctorOnboardingPage() {
       return;
     }
 
-    const { error } = await supabase.from("doctor_profiles").insert({
+    const { error } = await supabase.from("doctor_profiles").upsert({
       id: user.id,
       specialty: form.specialty,
       hospital: form.hospital.trim() || null,

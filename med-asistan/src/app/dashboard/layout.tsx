@@ -36,7 +36,14 @@ export default async function DashboardLayout({
       .select("id", { count: "exact", head: true })
       .eq("user_id", user.id)
       .eq("is_read", false);
-    unreadCount = count ?? 0;
+
+    const { count: inviteCount } = await supabase
+      .from("doctor_patients")
+      .select("id", { count: "exact", head: true })
+      .eq("patient_id", user.id)
+      .eq("status", "pending");
+
+    unreadCount = (count ?? 0) + (inviteCount ?? 0);
   }
 
   return (

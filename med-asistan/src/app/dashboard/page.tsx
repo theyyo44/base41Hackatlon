@@ -36,6 +36,7 @@ type MedicineWithSchedule = {
 type DoseItem = {
   id: string;
   medicineId: string;
+  scheduleId: string;
   name: string;
   dosage: string | null;
   notes: string | null;
@@ -52,11 +53,14 @@ export default function DashboardPage() {
     { id: string; doctorName: string; note: string | null }[]
   >([]);
 
+  const [userId, setUserId] = useState<string | null>(null);
+
   useEffect(() => {
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
+      setUserId(user.id);
 
       const { data: profile } = await supabase
         .from("profiles")
@@ -73,6 +77,26 @@ export default function DashboardPage() {
         .order("created_at", { ascending: false });
 
       if (meds) setMedicines(meds as MedicineWithSchedule[]);
+
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+
+      const { data: logs, error: logsError } = await supabase
+        .from("dose_logs")
+        .select("medicine_id, scheduled_at")
+        .eq("user_id", user.id)
+        .eq("status", "taken")
+        .gte("scheduled_at", todayStart.toISOString())
+        .lte("scheduled_at", todayEnd.toISOString());
+
+      if (!logsError && logs) {
+        setTakenIds(logs.map((l) => {
+          const time = new Date(l.scheduled_at).toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", hour12: false });
+          return `${l.medicine_id}-${time}`;
+        }));
+      }
 
       // Fetch pending doctor invites
       const { data: invites } = await supabase
@@ -109,14 +133,16 @@ export default function DashboardPage() {
     medicines.filter((m) => m.is_active).forEach((m) => {
       m.schedules?.forEach((s) => {
         s.times?.forEach((t) => {
+          const timeStr = t.slice(0, 5);
           list.push({
-            id: `${m.id}-${t}`,
+            id: `${m.id}-${timeStr}`,
             medicineId: m.id,
+            scheduleId: s.id,
             name: m.name,
             dosage: m.dosage,
             notes: s.notes,
-            time: t.slice(0, 5),
-            taken: takenIds.includes(`${m.id}-${t}`),
+            time: timeStr,
+            taken: takenIds.includes(`${m.id}-${timeStr}`),
           });
         });
       });
@@ -134,15 +160,60 @@ export default function DashboardPage() {
     .sort((a, b) => daysUntil(a.expiry_date!) - daysUntil(b.expiry_date!));
   const today = new Date();
 
-  function toggleDose(id: string) {
-    setTakenIds((ids) =>
-      ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]
-    );
+  async function toggleDose(id: string) {
     const dose = doses.find((d) => d.id === id);
-    if (dose) {
-      toast.success(
-        dose.taken ? "İşaret kaldırıldı" : `${dose.name} alındı olarak işaretlendi`
-      );
+    if (!dose || !userId) return;
+
+    const wasTaken = takenIds.includes(id);
+    setTakenIds((ids) =>
+      wasTaken ? ids.filter((x) => x !== id) : [...ids, id]
+    );
+
+    const supabase = createClient();
+
+    const today = new Date();
+    const [h, m] = dose.time.split(":").map(Number);
+    const scheduledAt = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0);
+
+    if (wasTaken) {
+      const { error } = await supabase
+        .from("dose_logs")
+        .update({ status: "pending", taken_at: null })
+        .eq("user_id", userId)
+        .eq("medicine_id", dose.medicineId)
+        .eq("scheduled_at", scheduledAt.toISOString());
+      if (error) toast.error("İşaret kaldırma başarısız: " + error.message);
+      toast.success("İşaret kaldırıldı");
+    } else {
+      const { data: existing } = await supabase
+        .from("dose_logs")
+        .select("id, status")
+        .eq("user_id", userId)
+        .eq("medicine_id", dose.medicineId)
+        .eq("scheduled_at", scheduledAt.toISOString())
+        .maybeSingle();
+
+      let error;
+      if (existing) {
+        ({ error } = await supabase
+          .from("dose_logs")
+          .update({ status: "taken", taken_at: new Date().toISOString() })
+          .eq("id", existing.id));
+      } else {
+        ({ error } = await supabase.from("dose_logs").insert({
+          user_id: userId,
+          medicine_id: dose.medicineId,
+          schedule_id: dose.scheduleId,
+          scheduled_at: scheduledAt.toISOString(),
+          status: "taken",
+          taken_at: new Date().toISOString(),
+        }));
+      }
+      if (error) {
+        toast.error("Kayıt başarısız: " + error.message);
+      } else {
+        toast.success(`${dose.name} alındı olarak işaretlendi`);
+      }
     }
   }
 

@@ -81,9 +81,18 @@ export default function LandingPage() {
     if (data.user) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, email")
         .eq("id", data.user.id)
         .single();
+
+      // Backfill email if missing
+      if (profile && !profile.email && data.user.email) {
+        await supabase
+          .from("profiles")
+          .update({ email: data.user.email.toLowerCase() })
+          .eq("id", data.user.id);
+      }
+
       if (profile?.role === "doctor") {
         router.push("/doctor-dashboard");
         return;

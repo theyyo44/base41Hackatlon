@@ -39,3 +39,17 @@ export type Notification = {
   is_read: boolean;
   created_at: string;
 };
+
+export type ChatMessage = {
+  id: string;
+  doctor_id: string;
+  patient_id: string;
+  sender_id: string;
+  message: string;
+  attachment_url: string | null;
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_type: string | null;
+  read_at: string | null;
+  created_at: string;
+};

@@ -9,6 +9,7 @@ import {
   List,
   CalendarDays,
   Bell,
+  MessageCircle,
   Heart,
   Menu,
   X,
@@ -29,6 +30,7 @@ const navItems = [
   { href: "/dashboard/add-medicine", label: "İlaç Ekle", icon: PlusCircle },
   { href: "/dashboard/inventory", label: "Envanter", icon: List },
   { href: "/dashboard/schedule", label: "Takvim", icon: CalendarDays },
+  { href: "/dashboard/messages", label: "Mesajlar", icon: MessageCircle },
   { href: "/dashboard/notifications", label: "Bildirimler", icon: Bell },
 ];
 

@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Users,
   Bell,
+  MessageCircle,
   UserCog,
   Menu,
   X,
@@ -25,7 +26,8 @@ type DoctorSidebarProps = {
 
 const navItems = [
   { href: "/doctor-dashboard", label: "Panel", icon: LayoutDashboard },
-  { href: "/doctor-dashboard/patients", label: "Hastalarım", icon: Users },
+  { href: "/doctor-dashboard/patients", label: "Hastalarim", icon: Users },
+  { href: "/doctor-dashboard/messages", label: "Mesajlar", icon: MessageCircle },
   { href: "/doctor-dashboard/invites", label: "Davetler", icon: Bell },
   { href: "/doctor-dashboard/profile", label: "Profil", icon: UserCog },
 ];
@@ -46,13 +48,12 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
   async function handleLogout() {
     const supabase = createClient();
     await supabase.auth.signOut();
-    toast.success("Çıkış yapıldı");
+    toast.success("Cikis yapildi");
     router.push("/");
   }
 
   return (
     <>
-      {/* Mobile topbar */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-card border-b px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[oklch(0.55_0.13_165)] to-[oklch(0.50_0.14_200)] flex items-center justify-center shadow-md">
@@ -82,7 +83,6 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        {/* Brand */}
         <div className="flex items-center gap-3 px-2.5 mb-1">
           <div className="w-[42px] h-[42px] rounded-xl bg-gradient-to-br from-[oklch(0.55_0.13_165)] to-[oklch(0.50_0.14_200)] flex items-center justify-center shadow-md">
             <Activity className="w-[22px] h-[22px] text-white" />
@@ -94,7 +94,7 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
         </div>
 
         <div className="text-[11px] font-bold tracking-widest text-muted-foreground/60 uppercase px-3 pt-5 pb-1.5">
-          Menü
+          Menu
         </div>
 
         <nav className="flex flex-col gap-0.5 mt-1">
@@ -129,7 +129,6 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
           })}
         </nav>
 
-        {/* User */}
         <div className="mt-auto border-t border-border pt-3.5 px-2 flex items-center gap-3">
           <div className="w-[42px] h-[42px] rounded-full bg-gradient-to-br from-[oklch(0.55_0.13_165)] to-[oklch(0.45_0.14_220)] text-white flex items-center justify-center font-bold text-sm">
             {initials}
@@ -140,7 +139,7 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
           </div>
           <button
             onClick={handleLogout}
-            title="Çıkış Yap"
+            title="Cikis Yap"
             className="w-[34px] h-[34px] rounded-lg flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors"
           >
             <LogOut className="w-[18px] h-[18px]" />

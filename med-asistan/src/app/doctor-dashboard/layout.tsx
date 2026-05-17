@@ -34,18 +34,27 @@ export default async function DoctorDashboardLayout({
     ? (await supabase.from("profiles").select("full_name").eq("id", user.id).single()).data?.full_name
     : null;
 
-  const { count: pendingInvites } = await supabase
-    .from("doctor_patients")
-    .select("id", { count: "exact", head: true })
-    .eq("doctor_id", user.id)
-    .eq("status", "pending");
+  const [inviteResult, msgResult] = await Promise.all([
+    supabase
+      .from("doctor_patients")
+      .select("id", { count: "exact", head: true })
+      .eq("doctor_id", user.id)
+      .eq("status", "pending"),
+    supabase
+      .from("chat_messages")
+      .select("id", { count: "exact", head: true })
+      .eq("doctor_id", user.id)
+      .neq("sender_id", user.id)
+      .is("read_at", null),
+  ]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] min-h-screen">
       <DoctorSidebar
         doctorName={doctorName || null}
         specialty={doctorProfile.specialty}
-        pendingInvites={pendingInvites ?? 0}
+        pendingInvites={inviteResult.count ?? 0}
+        unreadMessages={msgResult.count ?? 0}
       />
       <main className="min-w-0 w-full pt-14 md:pt-0 px-5 py-9 md:px-11 md:py-9">
         {children}

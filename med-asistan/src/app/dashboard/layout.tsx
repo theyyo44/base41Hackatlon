@@ -14,6 +14,7 @@ export default async function DashboardLayout({
   let userName: string | null = null;
   let userEmail: string | null = null;
   let unreadCount = 0;
+  let unreadMessages = 0;
 
   if (user) {
     userEmail = user.email ?? null;
@@ -31,24 +32,32 @@ export default async function DashboardLayout({
         .eq("id", user.id);
     }
 
-    const { count } = await supabase
-      .from("notifications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", user.id)
-      .eq("is_read", false);
+    const [notifResult, inviteResult, msgResult] = await Promise.all([
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .eq("is_read", false),
+      supabase
+        .from("doctor_patients")
+        .select("id", { count: "exact", head: true })
+        .eq("patient_id", user.id)
+        .eq("status", "pending"),
+      supabase
+        .from("chat_messages")
+        .select("id", { count: "exact", head: true })
+        .eq("patient_id", user.id)
+        .neq("sender_id", user.id)
+        .is("read_at", null),
+    ]);
 
-    const { count: inviteCount } = await supabase
-      .from("doctor_patients")
-      .select("id", { count: "exact", head: true })
-      .eq("patient_id", user.id)
-      .eq("status", "pending");
-
-    unreadCount = (count ?? 0) + (inviteCount ?? 0);
+    unreadCount = (notifResult.count ?? 0) + (inviteResult.count ?? 0);
+    unreadMessages = msgResult.count ?? 0;
   }
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-[280px_1fr] min-h-screen">
-      <Sidebar userName={userName} userEmail={userEmail} unreadCount={unreadCount} />
+      <Sidebar userName={userName} userEmail={userEmail} unreadCount={unreadCount} unreadMessages={unreadMessages} />
       <main className="min-w-0 w-full pt-14 md:pt-0 px-5 py-9 md:px-11 md:py-9">
         {children}
       </main>

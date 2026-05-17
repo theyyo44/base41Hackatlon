@@ -22,6 +22,7 @@ type DoctorSidebarProps = {
   doctorName?: string | null;
   specialty?: string | null;
   pendingInvites?: number;
+  unreadMessages?: number;
 };
 
 const navItems = [
@@ -32,7 +33,7 @@ const navItems = [
   { href: "/doctor-dashboard/profile", label: "Profil", icon: UserCog },
 ];
 
-export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: DoctorSidebarProps) {
+export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0, unreadMessages = 0 }: DoctorSidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -119,11 +120,16 @@ export function DoctorSidebar({ doctorName, specialty, pendingInvites = 0 }: Doc
                 )}
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
-                {item.href === "/doctor-dashboard/invites" && pendingInvites > 0 ? (
+                {item.href === "/doctor-dashboard/invites" && pendingInvites > 0 && (
                   <span className="ml-auto bg-rose text-white text-[11px] font-bold px-[7px] py-[2px] rounded-full min-w-[20px] text-center">
                     {pendingInvites}
                   </span>
-                ) : null}
+                )}
+                {item.href === "/doctor-dashboard/messages" && unreadMessages > 0 && (
+                  <span className="ml-auto bg-[oklch(0.55_0.13_165)] text-white text-[11px] font-bold px-[7px] py-[2px] rounded-full min-w-[20px] text-center">
+                    {unreadMessages}
+                  </span>
+                )}
               </Link>
             );
           })}

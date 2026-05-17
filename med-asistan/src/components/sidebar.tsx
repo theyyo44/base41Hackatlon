@@ -23,6 +23,7 @@ type SidebarProps = {
   userName?: string | null;
   userEmail?: string | null;
   unreadCount?: number;
+  unreadMessages?: number;
 };
 
 const navItems = [
@@ -34,7 +35,7 @@ const navItems = [
   { href: "/dashboard/notifications", label: "Bildirimler", icon: Bell },
 ];
 
-export function Sidebar({ userName, userEmail, unreadCount = 0 }: SidebarProps) {
+export function Sidebar({ userName, userEmail, unreadCount = 0, unreadMessages = 0 }: SidebarProps) {
   const pathname = usePathname();
   const router = useRouter();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -127,11 +128,16 @@ export function Sidebar({ userName, userEmail, unreadCount = 0 }: SidebarProps) 
                 )}
                 <item.icon className="w-5 h-5" />
                 <span>{item.label}</span>
-                {item.href === "/dashboard/notifications" && unreadCount > 0 ? (
+                {item.href === "/dashboard/notifications" && unreadCount > 0 && (
                   <span className="ml-auto bg-rose text-white text-[11px] font-bold px-[7px] py-[2px] rounded-full min-w-[20px] text-center">
                     {unreadCount}
                   </span>
-                ) : null}
+                )}
+                {item.href === "/dashboard/messages" && unreadMessages > 0 && (
+                  <span className="ml-auto bg-brand text-white text-[11px] font-bold px-[7px] py-[2px] rounded-full min-w-[20px] text-center">
+                    {unreadMessages}
+                  </span>
+                )}
               </Link>
             );
           })}

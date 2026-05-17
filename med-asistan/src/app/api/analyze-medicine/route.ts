@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
     if (!coverImage || !expiryImage) {
       return NextResponse.json(
-        { error: "Her iki fotoğraf da gerekli" },
+        { error: "Her iki fotograf da gerekli" },
         { status: 400 }
       );
     }
@@ -75,7 +75,7 @@ Eğer bir bilgiyi okuyamıyorsan o alanı boş string "" olarak bırak. Tarihi m
     if (!response.ok) {
       const err = await response.text();
       return NextResponse.json(
-        { error: "Gemini API hatası: " + err },
+        { error: "Gemini API hatasi: " + err },
         { status: 500 }
       );
     }
@@ -87,7 +87,7 @@ Eğer bir bilgiyi okuyamıyorsan o alanı boş string "" olarak bırak. Tarihi m
     const jsonMatch = text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
       return NextResponse.json(
-        { error: "Fotoğraflardan bilgi çıkarılamadı" },
+        { error: "Fotograflardan bilgi cikarilamadi" },
         { status: 422 }
       );
     }

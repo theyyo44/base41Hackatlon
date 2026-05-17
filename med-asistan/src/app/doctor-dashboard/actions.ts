@@ -7,7 +7,7 @@ export async function findPatientByEmail(email: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Oturum bulunamadı" };
+  if (!user) return { error: "Oturum bulunamadi" };
 
   const trimmedEmail = email.trim().toLowerCase();
 
@@ -28,7 +28,7 @@ export async function findPatientByEmail(email: string) {
 
   if (profile) return { patientId: profile.id, name: profile.full_name };
 
-  return { error: "Bu e-posta ile kayıtlı hasta bulunamadı. Hastanın uygulamaya kayıt olmuş olması gerekiyor." };
+  return { error: "Bu e-posta ile kayitli hasta bulunamadi. Hastanin uygulamaya kayit olmasi gerekiyor." };
 }
 
 export async function sendDoctorInvite(patientId: string, note: string) {
@@ -36,7 +36,7 @@ export async function sendDoctorInvite(patientId: string, note: string) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return { error: "Oturum bulunamadı" };
+  if (!user) return { error: "Oturum bulunamadi" };
 
   const { error } = await supabase.from("doctor_patients").insert({
     doctor_id: user.id,
@@ -46,8 +46,8 @@ export async function sendDoctorInvite(patientId: string, note: string) {
   });
 
   if (error) {
-    if (error.code === "23505") return { error: "Bu hastaya zaten davet gönderilmiş." };
-    return { error: "Davet gönderilemedi: " + error.message };
+    if (error.code === "23505") return { error: "Bu hastaya zaten davet gonderilmis." };
+    return { error: "Davet gonderilemedi: " + error.message };
   }
 
   return { success: true };

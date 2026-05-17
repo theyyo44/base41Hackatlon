@@ -42,7 +42,8 @@ Bu fotoğraflardan aşağıdaki bilgileri çıkar ve SADECE JSON formatında yan
 {
   "name": "İlaç adı (sadece marka adı, örn: Augmentin)",
   "activeIngredient": "Etken madde ve dozu (örn: Amoksisilin 875mg + Klavulanik asit 125mg)",
-  "dosage": "Önerilen doz (örn: 1 tablet, 5ml, vs.)",
+  "formType": "Sadece şu değerlerden biri: tablet | kapsul | surup | damla | sprey | krem | jel | ampul | flakon | diger",
+  "dosage": "Önerilen doz (formType ile uyumlu, örn: 1 tablet, 5 ml, 10 damla, 1 puff, ince tabaka)",
   "expiryDate": "YYYY-MM-DD formatında son kullanma tarihi",
   "quantity": "Kutudaki tahmini adet sayısı (sayı olarak)"
 }
@@ -111,10 +112,45 @@ Eğer bir bilgiyi okuyamıyorsan o alanı boş string "" olarak bırak. Tarihi m
       }
     }
 
+    const normalizeFormType = (value: unknown): string => {
+      const raw = String(value || "").toLowerCase().trim();
+      if (!raw) return "diger";
+      if (raw.includes("tablet")) return "tablet";
+      if (raw.includes("kaps")) return "kapsul";
+      if (raw.includes("surup") || raw.includes("şurup") || raw.includes("syrup")) return "surup";
+      if (raw.includes("damla") || raw.includes("drop")) return "damla";
+      if (raw.includes("sprey") || raw.includes("spray") || raw.includes("puff")) return "sprey";
+      if (raw.includes("krem")) return "krem";
+      if (raw.includes("jel") || raw.includes("gel")) return "jel";
+      if (raw.includes("ampul")) return "ampul";
+      if (raw.includes("flakon") || raw.includes("vial")) return "flakon";
+      return "diger";
+    };
+
+    const inferFormTypeFromText = (input: string): string => {
+      const t = input.toLowerCase();
+      if (/\btablet\b/.test(t)) return "tablet";
+      if (/\bkaps[üu]l\b/.test(t)) return "kapsul";
+      if (/\b(s[üu]rup|syrup)\b/.test(t)) return "surup";
+      if (/\bdamla\b/.test(t)) return "damla";
+      if (/\b(sprey|spray|puff)\b/.test(t)) return "sprey";
+      if (/\bkrem\b/.test(t)) return "krem";
+      if (/\b(jel|gel)\b/.test(t)) return "jel";
+      if (/\bampul\b/.test(t)) return "ampul";
+      if (/\bflakon\b/.test(t)) return "flakon";
+      return "diger";
+    };
+
+    const formType =
+      normalizeFormType(result.formType) !== "diger"
+        ? normalizeFormType(result.formType)
+        : inferFormTypeFromText(`${result.name || ""} ${result.activeIngredient || ""} ${result.dosage || ""}`);
+
     return NextResponse.json({
       name: result.name || "",
       activeIngredient: result.activeIngredient || "",
       dosage: result.dosage || "",
+      formType,
       expiryDate,
       quantity: parseInt(result.quantity, 10) || 1,
     });
